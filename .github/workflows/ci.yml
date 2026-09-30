@@ -1,0 +1,64 @@
+name: CI
+
+# Offline: no AWS credentials, no OIDC token, no Connect call. Live deploys are
+# deploy.yml, dispatched by hand.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Every third-party action below is pinned to a full commit SHA with its tag in
+# a trailing comment, the same SHAs flow-as-code pins. .github/dependabot.yml
+# moves them forward; tests/workflows.test.ts fails on an unpinned `uses:`.
+
+jobs:
+  check:
+    name: check / node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # engines.node is >=22.12, so 22 is the floor; 24 is the Active LTS and
+        # 26 the current release. flow-as-code gates on the same three.
+        node: [22, 24, 26]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+
+  # `tofu validate` of every root under envs/, each with the flows.tf its
+  # profile emits, envs/prod with both prod and prod-october (npm run validate
+  # emits into a temporary copy itself). Downloads the aws, archive and
+  # flowascode providers from the registry, checked against the committed lock
+  # files, which is the only network this workflow uses. 1.10 is the
+  # flowascode provider's OpenTofu floor.
+  validate:
+    name: validate / tofu 1.10
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ~1.10.0
+          tofu_wrapper: false
+      - run: npm ci
+      - run: npm run validate

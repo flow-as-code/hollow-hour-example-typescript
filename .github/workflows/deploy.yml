@@ -1,0 +1,139 @@
+name: deploy
+
+# Applies one environment to its own Amazon Connect instance. Dispatch only:
+# the Connect API throttle is shared with anything else in the account, and a
+# push must never reach a live instance.
+#
+# Set up once per GitHub environment (dev, qa, prod; prod with a required
+# reviewer, configured in the repository's environment settings):
+#   variables  AWS_DEPLOY_ROLE_ARN  an IAM role that trusts this repository's
+#                                   GitHub OIDC subject for that environment
+#              AWS_REGION           the instance's region
+#              CONNECT_INSTANCE_ID  the instance id (a UUID, masked in logs)
+#              TF_STATE_BUCKET      the S3 bucket holding this environment's state
+# None of them is written to a file, and the account id is masked.
+#
+# Order: the seasonal root first (the greeting modules and their `live`
+# aliases), then the flow root, which reads the seasonal outputs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Which environment, and so which instance
+        type: choice
+        options: [dev, qa, prod]
+        required: true
+      season:
+        description: prod only. october deploys the prod-october profile.
+        type: choice
+        options: [standard, october]
+        default: standard
+      apply:
+        description: Apply after planning. Unchecked, the run plans only.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One run per environment at a time, never cancelled halfway through an apply,
+# and separate from the provider repository's sandbox-acceptance group.
+concurrency:
+  group: hollow-hour-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy / ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_IN_AUTOMATION: "1"
+      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      TF_VAR_connect_instance_id: ${{ vars.CONNECT_INSTANCE_ID }}
+    steps:
+      - name: Pick the profile
+        id: profile
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          SEASON: ${{ inputs.season }}
+        run: |
+          set -euo pipefail
+          if [ "$SEASON" = october ]; then
+            if [ "$ENVIRONMENT" != prod ]; then
+              echo "::error::season october exists only for prod (profile prod-october)." >&2
+              exit 1
+            fi
+            echo "name=prod-october" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ~1.10.0
+          tofu_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: true
+      - name: Mask the instance id
+        run: echo "::add-mask::${TF_VAR_connect_instance_id}"
+      - run: npm ci
+      # The same gates a pull request passes, then the emit this run applies.
+      - run: npm run check
+      - run: npm run "emit:${{ steps.profile.outputs.name }}"
+      - name: Seasonal root
+        id: seasonal
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          APPLY: ${{ inputs.apply }}
+        run: |
+          set -euo pipefail
+          dir="envs/seasonal-$ENVIRONMENT"
+          tofu -chdir="$dir" init -input=false -lockfile=readonly \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="key=hollow-hour/$ENVIRONMENT/seasonal.tfstate" \
+            -backend-config="region=$TF_VAR_aws_region"
+          tofu -chdir="$dir" plan -input=false -no-color -out=seasonal.tfplan
+          if [ "$APPLY" = true ]; then tofu -chdir="$dir" apply -input=false seasonal.tfplan; fi
+          # The flow root reads this root's outputs through
+          # terraform_remote_state, so it cannot be planned until they exist.
+          if [ -n "$(tofu -chdir="$dir" state list)" ]; then
+            echo "applied=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "applied=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Refuse to plan the flow root before the first seasonal apply
+        if: steps.seasonal.outputs.applied != 'true'
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          echo "::error::envs/seasonal-$ENVIRONMENT has never been applied, so the flow root has no greeting outputs to read and cannot be planned. The seasonal plan above is what a first apply would create; dispatch again with apply checked to apply both roots in order." >&2
+          exit 1
+      - name: Flow root
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          APPLY: ${{ inputs.apply }}
+        run: |
+          set -euo pipefail
+          export TF_VAR_seasonal_state="{bucket=\"$TF_STATE_BUCKET\",key=\"hollow-hour/$ENVIRONMENT/seasonal.tfstate\",region=\"$TF_VAR_aws_region\"}"
+          dir="envs/$ENVIRONMENT"
+          tofu -chdir="$dir" init -input=false -lockfile=readonly \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="key=hollow-hour/$ENVIRONMENT/flows.tfstate" \
+            -backend-config="region=$TF_VAR_aws_region"
+          tofu -chdir="$dir" plan -input=false -no-color -out=flows.tfplan
+          if [ "$APPLY" = true ]; then tofu -chdir="$dir" apply -input=false flows.tfplan; fi

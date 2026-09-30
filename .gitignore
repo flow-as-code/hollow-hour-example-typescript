@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Test and coverage
+coverage/
+.vitest/
+
+# Emitter output. `npm run emit:<profile>` writes the raw emitted tree to
+# build/emit/<profile>/ and copies its flows.tf into the environment root it
+# deploys from; neither copy is tracked, so neither can rot.
+build/
+envs/*/flows.tf
+
+# Terraform / OpenTofu scratch and state. State lives in each environment's
+# remote backend, never here. Each root's .terraform.lock.hcl is committed
+# (npm run lock:providers writes it), so a deploy installs only the provider
+# builds whose hashes were reviewed.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfplan
+.tofu-cache/
+
+# Simulate resource maps hold ARNs, so they stay on the operator's machine.
+scenarios/*.resources.json
+
+# Lambda bundles built for an apply.
+lambdas/*/dist/
+lambdas/*.zip
+
+# Local env; never commit AWS credentials, account ids or instance ids.
+.env
+.env.*
+!.env.example
+
+# Editor and OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Session worktrees
+.claude/

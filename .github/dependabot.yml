@@ -1,0 +1,32 @@
+version: 2
+
+# Every third-party action in .github/workflows/ is pinned to a full commit SHA
+# with its version in a trailing comment (tests/workflows.test.ts holds
+# that). Dependabot rewrites the SHA and the comment together, so an update
+# arrives through review and CI rather than silently at run time.
+# https://docs.github.com/en/code-security/dependabot/working-with-dependabot/keeping-your-actions-up-to-date-with-dependabot
+#
+# @flow-as-code/cli and @flow-as-code/core are pinned exactly and move together;
+# a Dependabot PR that bumps one without the other fails tests/packagePins.test.ts.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
+    groups:
+      flow-as-code:
+        patterns: ["@flow-as-code/*"]
+      tooling:
+        patterns: ["*"]
+        exclude-patterns: ["@flow-as-code/*"]

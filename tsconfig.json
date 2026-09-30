@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noUncheckedIndexedAccess": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "types": ["node"],
+    "allowJs": true,
+    "checkJs": true
+  },
+  "include": [
+    "generators/**/*.ts",
+    "flows/**/*.ts",
+    "seasonal/**/*.ts",
+    "lambdas/**/*.ts",
+    "lambdas/**/*.mjs",
+    "tests/**/*.ts",
+    "vitest.config.ts"
+  ]
+}

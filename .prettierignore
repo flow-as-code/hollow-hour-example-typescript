@@ -1,0 +1,16 @@
+node_modules/
+coverage/
+build/
+package-lock.json
+.vitest/
+.terraform/
+
+# FlowDocs are canonical serializer output (what flow-cli and the generator
+# write), and their generated companions are codegen output. Prettier would
+# reformat both and break the byte-stability the round-trip tests hold.
+flows/
+seasonal/
+
+# Derived address maps are written by `npm run generate` in its own canonical
+# form and held to it by `npm run generate:check`.
+refs/*.tfmap.json

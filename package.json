@@ -1,0 +1,43 @@
+{
+  "name": "hollow-hour",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Hollow Hour Removal Co.: a fictional Amazon Connect showcase for flow-as-code",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "generate": "tsx generators/districts.ts",
+    "generate:check": "tsx generators/districts.ts --check",
+    "lint": "eslint . && prettier --check . && npm run headers",
+    "lint:flows": "node scripts/lint-flows.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "emit:dev": "node scripts/emit.mjs dev",
+    "emit:qa": "node scripts/emit.mjs qa",
+    "emit:prod": "node scripts/emit.mjs prod",
+    "emit:prod-october": "node scripts/emit.mjs prod-october",
+    "validate": "node scripts/validate.mjs",
+    "lock:providers": "node scripts/lock-providers.mjs",
+    "format": "prettier --write .",
+    "headers": "node scripts/license-headers.mjs",
+    "headers:fix": "node scripts/license-headers.mjs --fix",
+    "check": "npm run lint && npm run typecheck && npm run generate:check && npm run lint:flows && npm test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@flow-as-code/cli": "0.2.0",
+    "@flow-as-code/core": "0.2.0",
+    "@types/node": "^22.20.1",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.11.0",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}
