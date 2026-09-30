@@ -17,7 +17,10 @@ const cells = (line: string) =>
     .split(" | ")
     .map((c) => c.trim());
 
-const STATUS = /^(docs-checked 2026-09-30|needs sandbox|sandbox-checked \d{4}-\d{2}-\d{2}, .+)$/;
+// A sandbox result carries its UTC date, the Region it ran in and what the
+// service said: `sandbox-checked 2026-10-01, us-west-2: accepted`.
+const STATUS =
+  /^(docs-checked 2026-09-30|needs sandbox|sandbox-checked \d{4}-\d{2}-\d{2}, [a-z]{2}(-gov)?-[a-z]+-\d: .+)$/;
 
 describe("VERIFY.md", () => {
   it("has the columns the tasks rely on", () => {
@@ -55,6 +58,12 @@ describe("VERIFY.md", () => {
     ]) {
       expect(ids).toContain(id);
     }
+  });
+
+  it("reads a sandbox status only with its date, Region and result", () => {
+    expect(STATUS.test("sandbox-checked 2026-10-01, us-west-2: accepted")).toBe(true);
+    expect(STATUS.test("sandbox-checked 2026-10-01 accepted")).toBe(false);
+    expect(STATUS.test("sandbox-checked 2026-10-01, accepted")).toBe(false);
   });
 
   it("gives every row six cells, an AWS doc URL, a status and a design change", () => {
