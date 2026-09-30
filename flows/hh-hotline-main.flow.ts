@@ -2,9 +2,9 @@
 // Edits to structure regenerate; comments marked @keep survive.
 
 import {
-  Compare,
   DisconnectParticipant,
   Flow,
+  GenericBlock,
   GetParticipantInput,
   InvokeFlowModule,
   InvokeLambdaFunction,
@@ -20,7 +20,6 @@ import {
   UpdateContactTextToSpeechVoice,
   UpdateFlowAttributes,
   UpdateFlowLoggingBehavior,
-  jsonPath,
 } from "@flow-as-code/core";
 
 export function hhHotlineMain(): Flow {
@@ -74,14 +73,16 @@ export function hhHotlineMain(): Flow {
       next: "check-caller",
       onError: "ask-anyone-hurt",
     }),
-    new Compare({
+    new GenericBlock({
       id: "check-caller",
-      value: jsonPath("$.External.status"),
-      branches: [
-        { operator: "Equals", operands: ["known"], target: "remember-caller" },
-        { operator: "Equals", operands: ["account"], target: "remember-caller" },
+      type: "Compare",
+      parameters: { ComparisonValue: "$.External.status" },
+      next: "ask-anyone-hurt",
+      errors: [{ errorType: "NoMatchingCondition", target: "ask-anyone-hurt" }],
+      conditions: [
+        { target: "remember-caller", operator: "Equals", operands: ["known"] },
+        { target: "remember-caller", operator: "Equals", operands: ["account"] },
       ],
-      onNoMatch: "ask-anyone-hurt",
     }),
     new UpdateContactAttributes({
       id: "remember-caller",
@@ -294,17 +295,19 @@ export function hhHotlineMain(): Flow {
       next: "check-grade",
       onError: "check-grade",
     }),
-    new Compare({
+    new GenericBlock({
       id: "check-grade",
-      value: jsonPath("$.Attributes.grade"),
-      branches: [
-        { operator: "Equals", operands: ["1"], target: "to-district-menu" },
-        { operator: "Equals", operands: ["2"], target: "to-district-menu" },
-        { operator: "Equals", operands: ["3"], target: "to-district-menu" },
-        { operator: "Equals", operands: ["4"], target: "send-to-lantern-crew" },
-        { operator: "Equals", operands: ["5"], target: "send-to-lantern-crew" },
+      type: "Compare",
+      parameters: { ComparisonValue: "$.Attributes.grade" },
+      next: "hand-to-dispatch",
+      errors: [{ errorType: "NoMatchingCondition", target: "hand-to-dispatch" }],
+      conditions: [
+        { target: "to-district-menu", operator: "Equals", operands: ["1"] },
+        { target: "to-district-menu", operator: "Equals", operands: ["2"] },
+        { target: "to-district-menu", operator: "Equals", operands: ["3"] },
+        { target: "send-to-lantern-crew", operator: "Equals", operands: ["4"] },
+        { target: "send-to-lantern-crew", operator: "Equals", operands: ["5"] },
       ],
-      onNoMatch: "hand-to-dispatch",
     }),
     new TransferToFlow({
       id: "to-district-menu",

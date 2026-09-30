@@ -148,6 +148,7 @@
           "ComparisonValue": "$.External.status"
         },
         "Transitions": {
+          "NextAction": "ask-anyone-hurt",
           "Errors": [
             {
               "ErrorType": "NoMatchingCondition",
@@ -880,6 +881,7 @@
           "ComparisonValue": "$.Attributes.grade"
         },
         "Transitions": {
+          "NextAction": "hand-to-dispatch",
           "Errors": [
             {
               "ErrorType": "NoMatchingCondition",
@@ -1494,7 +1496,7 @@
   ],
   "meta": {
     "generator": "cli@0.2.0",
-    "sourceHash": "sha256:192be666902c4b3e476970df7189b5baa25581ac12bac9bfa5c68898acb0100f",
+    "sourceHash": "sha256:1a6e534f20adaf828e595efede573f6ef91ab8af128f41388174e9f0d0f51f44",
     "sourceKind": "ts"
   }
 }

@@ -15,6 +15,7 @@
           "ComparisonValue": "$.Attributes.moved"
         },
         "Transitions": {
+          "NextAction": "poll-crews",
           "Errors": [
             {
               "ErrorType": "NoMatchingCondition",
@@ -430,7 +431,7 @@
   ],
   "meta": {
     "generator": "hollow-hour-example generators/districts.ts",
-    "sourceHash": "sha256:0efa4d5f23174e978258323412ec5dcae44ef31e9735f0e532b4e39fe39d0f62",
+    "sourceHash": "sha256:228e2fd62ab114eb01d2764d3f5533d71b6708ff8305203884bd8fa165b6cda6",
     "sourceKind": "ts"
   }
 }

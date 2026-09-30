@@ -32,12 +32,12 @@
 
 import {
   CheckHoursOfOperation,
-  Compare,
   CheckMetricData,
   DequeueContactAndTransferToQueue,
   DisconnectParticipant,
   EndFlowExecution,
   Flow,
+  GenericBlock,
   GetMetricData,
   GetParticipantInput,
   InvokeLambdaFunction,
@@ -51,7 +51,6 @@ import {
   UpdateContactEventHooks,
   UpdateContactTargetQueue,
   UpdateFlowAttributes,
-  jsonPath,
 } from "@flow-as-code/core";
 import type { DtmfBranch } from "@flow-as-code/core";
 import type { District } from "./config.js";
@@ -210,11 +209,15 @@ export function queueExperienceFlow(d: District, districts: readonly District[])
     description: `Queue for the ${d.name} crew, offering a move to ${over.name} when that crew is free. Generated from districts.config.json by generators/districts.ts; edit the config, not this flow.`,
     connectType: "CUSTOMER_QUEUE",
   }).add(
-    new Compare({
+    // Connect refuses a Compare with no NextAction (2026-09-30); the Compare
+    // class writes none, so this one is generic until the catalog mirrors it.
+    new GenericBlock({
       id: "check-moved",
-      value: jsonPath("$.Attributes.moved"),
-      branches: [{ operator: "Equals", operands: ["true"], target: "settle-in" }],
-      onNoMatch: "poll-crews",
+      type: "Compare",
+      parameters: { ComparisonValue: "$.Attributes.moved" },
+      next: "poll-crews",
+      errors: [{ errorType: "NoMatchingCondition", target: "poll-crews" }],
+      conditions: [{ operator: "Equals", operands: ["true"], target: "settle-in" }],
     }),
     new Loop({
       id: "poll-crews",
