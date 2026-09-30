@@ -8,9 +8,13 @@ instances, where every difference between those environments, the Halloween
 season included, is a reference binding rather than an edit to a flow.
 
 > Status: **Tier 1 built, not yet deployed** (task T1). The Tier 1 flows, the
-> stub Lambdas and all six environment roots are in place and pass every
-> offline check, `tofu validate` included. The live deploy of dev, qa and prod
-> and the operator run of scenario S2 (T1 criterion 10) are still to come. See
+> stub Lambdas and all seven roots (six environment roots plus
+> `envs/bootstrap`) are in place and pass every offline check,
+> `tofu validate` included. Nothing is deployed yet: the first step, and the
+> one everything live waits on, is the operator's apply of `envs/bootstrap`
+> ([envs/README.md, Bootstrap](envs/README.md#bootstrap)), which creates the
+> three instances and the state bucket. The deploy of dev, qa and prod and the
+> operator run of scenario S2 (T1 criterion 10) follow it. See
 > [Tiers and status](#tiers-and-status).
 
 ## The premise
@@ -239,7 +243,9 @@ dispatched by hand, one environment at a time, with a reviewer on prod.
 Supporting resources are named `hh-<environment>-*` and tagged
 `hollow-hour-example = true`; flows and modules carry the constant `hh-` prefix.
 Tear down with `tofu destroy` in `envs/<environment>`, then in
-`envs/seasonal-<environment>`.
+`envs/seasonal-<environment>`, with the same exports and `init` as the apply;
+removing the instances and the state bucket as well takes the steps in
+[envs/README.md, Teardown](envs/README.md#teardown).
 
 ## What is simulated and what is not
 

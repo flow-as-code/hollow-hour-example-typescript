@@ -85,10 +85,40 @@ tofu init -migrate-state -force-copy \
 tofu state list   # reads from the bucket now
 ```
 
-Once `tofu state list` reads the resources back from the bucket, delete any
-`terraform.tfstate` and `terraform.tfstate.backup` left in the directory
-(both gitignored). From then on, and from any fresh clone, run the same
-`tofu init` with those four `-backend-config` values and no override.
+Confirm the state object is in the bucket too:
+
+```sh
+aws s3api head-object --bucket "$bucket" \
+  --key hollow-hour-example/bootstrap.tfstate --region "$state_region"
+```
+
+Once both read it back, delete any `terraform.tfstate` and
+`terraform.tfstate.backup` left in the directory (both gitignored). Until
+then that local file is the only record of three instances and a bucket, so
+run the migration straight after the apply. From then on, and from any fresh
+clone, run the same `tofu init` with those four `-backend-config` values and
+no override.
+
+A fresh clone cannot read the bucket name from `tofu output`, because that
+reads the state the bucket holds. Keep it in the GitHub variable
+`TF_STATE_BUCKET`, or find it again with:
+
+```sh
+aws s3api list-buckets \
+  --query "Buckets[?starts_with(Name,'hollow-hour-example-tfstate-')].Name" \
+  --output text
+```
+
+Each instance's flow logs go to a CloudWatch log group that Connect creates
+with the instance, `/aws/connect/<alias>`, which no root manages and which
+keeps its logs indefinitely by default (VERIFY.md, H4). Give each one the
+retention the stub Lambda groups have:
+
+```sh
+tofu output -json instances   # each environment's alias and Region
+aws logs put-retention-policy --log-group-name /aws/connect/<alias> \
+  --retention-in-days 14 --region <that environment's Region>
+```
 
 `tofu output instances` gives each environment's instance id and Region:
 `TF_VAR_connect_instance_id` and `TF_VAR_aws_region` for that environment's
@@ -97,9 +127,77 @@ roots (the GitHub environment's `CONNECT_INSTANCE_ID` and `AWS_REGION`).
 and region (`TF_STATE_BUCKET` and `TF_STATE_REGION`). None of them is
 committed.
 
-Tear down the environment roots first; the bucket's `prevent_destroy` makes
-`tofu destroy` here refuse until that line is removed on purpose, and the
-state of every root lives in it.
+## Teardown
+
+In this order; each step needs the one before it to have finished.
+
+1. For each environment, destroy the flow root and then its seasonal root
+   (the flow root reads the seasonal root's state, and its flows refer to the
+   greeting aliases). Export the same `TF_VAR_connect_instance_id`,
+   `TF_VAR_aws_region` and `TF_VAR_seasonal_state` as for the apply, emit the
+   same profile (`npm run emit:<profile>`, since every root needs its
+   `flows.tf` to plan), and init with the same four `-backend-config` values:
+
+   ```sh
+   tofu -chdir=envs/<environment> init -backend-config=...   # as for the apply
+   tofu -chdir=envs/<environment> destroy
+   tofu -chdir=envs/seasonal-<environment> init -backend-config=...
+   tofu -chdir=envs/seasonal-<environment> destroy
+   ```
+
+2. Move the bootstrap state out of the bucket it is about to delete, back to
+   local state:
+
+   ```sh
+   cd envs/bootstrap
+   printf 'terraform {\n  backend "local" {}\n}\n' > local_override.tf
+   tofu init -migrate-state -force-copy
+   tofu state list   # reads from the local file now
+   bucket=$(tofu output -raw state_bucket)
+   state_region=$(tofu output -raw state_region)
+   ```
+
+   Steps 3 to 6 run in this same shell, from `envs/bootstrap`; step 4 needs
+   `bucket` and `state_region`.
+
+3. Destroy the instances alone. `prevent_destroy` on the bucket fails any plan
+   that would delete it, so a plain `tofu destroy` refuses here:
+
+   ```sh
+   tofu destroy -target=aws_connect_instance.env
+   ```
+
+   Then delete each instance's flow log group, `/aws/connect/<alias>`, if it
+   is still there (VERIFY.md, H4):
+
+   ```sh
+   aws logs delete-log-group --log-group-name /aws/connect/<alias> \
+     --region <that environment's Region>
+   ```
+
+4. Empty the bucket. It is versioned and has no `force_destroy`, so deleting
+   it while any object version or delete marker remains fails with
+   `BucketNotEmpty`. Delete every version and every delete marker (the
+   console's "Empty" action does both), then check that nothing is left:
+
+   ```sh
+   aws s3api list-object-versions --bucket "$bucket" --region "$state_region" \
+     --query '{v: length(Versions || `[]`), m: length(DeleteMarkers || `[]`)}'
+   ```
+
+5. Remove the `lifecycle { prevent_destroy = true }` block from
+   `state.tf` on purpose, as a local edit you do not commit, and destroy the
+   rest:
+
+   ```sh
+   tofu destroy
+   ```
+
+6. Delete `local_override.tf` and the local `terraform.tfstate*`, and restore
+   `state.tf` (`git checkout envs/bootstrap/state.tf`). That discards the
+   uncommitted edit from step 5, so the guard is back for the next bootstrap.
+
+`tests/envBootstrap.test.ts` holds this order.
 
 ## The deploy role
 

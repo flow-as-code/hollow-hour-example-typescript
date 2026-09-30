@@ -10,6 +10,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+const guide = readFileSync(join(import.meta.dirname, "..", "envs", "README.md"), "utf8");
+
 const DIR = join(import.meta.dirname, "..", "envs", "bootstrap");
 const text = readdirSync(DIR)
   .filter((f) => f.endsWith(".tf") && !f.endsWith("_override.tf"))
@@ -73,5 +75,35 @@ describe("envs/bootstrap", () => {
 
   it("creates no user, routing profile or security profile: Tier 1 needs none", () => {
     expect(text).not.toMatch(/resource "aws_connect_(user|routing_profile|security_profile)"/);
+  });
+
+  it("documents a teardown that reaches the bootstrap root, in an order that can succeed", () => {
+    const start = guide.indexOf("## Teardown");
+    expect(start, "envs/README.md has a Teardown section").toBeGreaterThan(-1);
+    const next = guide.indexOf("\n## ", start + 1);
+    const teardown = guide.slice(start, next === -1 ? undefined : next);
+    const at = (needle: string) => {
+      const i = teardown.indexOf(needle);
+      expect(i, needle).toBeGreaterThan(-1);
+      return i;
+    };
+    const steps = [
+      "tofu -chdir=envs/<environment> destroy",
+      "tofu -chdir=envs/seasonal-<environment> destroy",
+      "tofu init -migrate-state -force-copy",
+      "tofu destroy -target=aws_connect_instance.env",
+      "aws logs delete-log-group --log-group-name /aws/connect/<alias>",
+      "list-object-versions",
+      "prevent_destroy = true",
+      "tofu destroy\n",
+    ].map(at);
+    expect(steps).toEqual([...steps].sort((a, b) => a - b));
+    expect(teardown).toContain("TF_VAR_connect_instance_id");
+    expect(teardown).toContain("TF_VAR_seasonal_state");
+    expect(teardown).toContain("BucketNotEmpty");
+  });
+
+  it("says how a fresh clone finds the state bucket again", () => {
+    expect(guide).toContain("starts_with(Name,'hollow-hour-example-tfstate-')");
   });
 });
