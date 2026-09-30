@@ -138,6 +138,17 @@ the environment, never committed>` exits 0 for each; and scenario S2
         increase to 10 was requested at 2026-09-30T20:12:35Z. At 20:46 UTC
         Service Quotas listed it as `CASE_OPENED`, an open AWS Support case,
         last updated at 20:15:43 UTC (envs/README.md, Bootstrap).
+  - [x] dev moved from us-west-2 to us-east-1 later on 2026-09-30, at the
+        owner's request that the TypeScript-first repository use us-east-1
+        and the Terraform-first one us-west-2: envs/dev (55) and
+        envs/seasonal-dev (6) destroyed, the bootstrap default changed, the
+        dev instance replaced (refused once with "Invalid Input. Instance
+        alias is already used.", created by a re-apply minutes later), the
+        old flow log group deleted, seasonal-dev (6) and dev (55) applied
+        again. `npm run drift` then reported "No drift." on dev, qa and
+        prod (dev after its resource map was rebuilt), and S2 passed on the
+        new dev in about 103 s (VERIFY.md, R1; envs/README.md, "Moving an
+        environment to another Region").
 
 ## Assumptions
 
@@ -150,6 +161,9 @@ the environment, never committed>` exits 0 for each; and scenario S2
 - The instance quota for three live environments is resolved by the owner
   before criterion 10 (VERIFY H3). Resolved 2026-09-30 by Region: dev in
   us-west-2, qa and prod in us-east-1, each within the default quota of two.
+  Changed later on 2026-09-30: all three in us-east-1, on a quota raised
+  above two there, so that this repository and the Terraform-first one
+  (all three in us-west-2) never share a Region (VERIFY R1).
 
 ## Sandbox checklist (criterion 10)
 

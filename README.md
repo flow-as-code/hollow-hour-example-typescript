@@ -18,7 +18,11 @@ environment. For the same hotline written entirely in Terraform, see
 > flow root, dev and qa earlier that day and prod at about 20:20 UTC, with
 > every FlowDoc matching what is live (`npm run drift`). Scenario S2 passed on
 > dev and on prod; on qa it waits on a quota increase for the instance's
-> concurrent calls (VERIFY.md, S2). See [Tiers and status](#tiers-and-status).
+> concurrent calls (VERIFY.md, S2). All three instances are in us-east-1:
+> dev moved there from us-west-2 later that day, by destroy, instance
+> replacement and re-apply, and afterwards drift was clean on all three and
+> S2 passed on the new dev (VERIFY.md, R1). See
+> [Tiers and status](#tiers-and-status).
 >
 > The deploy found that Amazon Connect refuses a Compare with no
 > `Transitions.NextAction`, which flow-as-code 0.2.0's typed Compare does not
@@ -197,10 +201,13 @@ providers from the registry the first time (about a minute; cached in
 Before the first deploy you need:
 
 - a Connect instance per environment and an S3 bucket for state.
-  [`envs/bootstrap`](envs/README.md#bootstrap) creates both: dev in
-  `us-west-2`, qa and prod in `us-east-1`, and the bucket in `us-east-1` by
-  default. The default quota is two instances per account and Region
-  (VERIFY.md, H3), which is why the three are split across two Regions;
+  [`envs/bootstrap`](envs/README.md#bootstrap) creates both, by default
+  all three instances and the bucket in `us-east-1`. The default quota is
+  two instances per account and Region (VERIFY.md, H3), so this repository
+  alone needs it raised to at least 3 in `us-east-1`, plus any instances
+  already there; [envs/README.md, Bootstrap](envs/README.md#bootstrap) has
+  the read and the request. The Terraform-first repository keeps its three
+  in `us-west-2`, so the two never share a Region;
 - credentials whose role can do what the roots do: read the instance
   (`connect:DescribeInstance`); create and delete Connect queues, hours of
   operation, flows, flow modules and their versions and aliases, and Lambda
@@ -218,8 +225,8 @@ deploy there is two dispatches; [envs/README.md, First apply](envs/README.md#fir
 
 ```sh
 # From `tofu -chdir=envs/bootstrap output`: dev's instance and Region, and
-# the state bucket and its Region, which is not dev's.
-export TF_VAR_aws_region=us-west-2
+# the state bucket and its Region, which need not be the same.
+export TF_VAR_aws_region=us-east-1
 export TF_VAR_connect_instance_id=<dev instance id>
 export TF_VAR_seasonal_state='{bucket="<state bucket>",key="hollow-hour-example/dev/seasonal.tfstate",region="us-east-1"}'
 
@@ -285,12 +292,12 @@ instance yet.
 
 ## Tiers and status
 
-| Tier | Name          | Scope                                                                                                                                                        | Status                                                                 |
-| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| T0   | Scaffold      | Layout, toolchain, CI, environment roots, reference manifest, VERIFY.md                                                                                      | done; owner setup open                                                 |
-| T1   | First night   | Main line with keypad triage and interview, generated district and queue flows, whispers, seasonal greetings, supporting resources in all three environments | live in dev, qa and prod (2026-09-30); qa S2 waits on a quota increase |
-| T2   | Full moon     | Address and callback modules, holds, prank screen, the Queue of the Dead, scenarios                                                                          | not started                                                            |
-| T3   | Witching hour | Chat field guide, outbound follow-ups, transfers to named crew, the drift scene                                                                              | after the season                                                       |
+| Tier | Name          | Scope                                                                                                                                                        | Status                                                                                   |
+| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| T0   | Scaffold      | Layout, toolchain, CI, environment roots, reference manifest, VERIFY.md                                                                                      | done; owner setup open                                                                   |
+| T1   | First night   | Main line with keypad triage and interview, generated district and queue flows, whispers, seasonal greetings, supporting resources in all three environments | live in dev, qa and prod, all in us-east-1 (2026-09-30); qa S2 waits on a quota increase |
+| T2   | Full moon     | Address and callback modules, holds, prank screen, the Queue of the Dead, scenarios                                                                          | not started                                                                              |
+| T3   | Witching hour | Chat field guide, outbound follow-ups, transfers to named crew, the drift scene                                                                              | after the season                                                                         |
 
 Each tier's acceptance criteria are in [`tasks/`](tasks/).
 

@@ -54,7 +54,7 @@ permissions:
   contents: read
 
 # One deploy at a time across every environment, never cancelled halfway
-# through an apply: qa and prod share us-east-1 and its Connect API throttle.
+# through an apply: dev, qa and prod share us-east-1 and its Connect API throttle.
 # Separate from the provider repository's sandbox-acceptance group.
 concurrency:
   group: hollow-hour-example-deploy

@@ -36,7 +36,7 @@ Within each group the roots are byte-identical except `environment.tf`
 supplied at plan time (`TF_VAR_connect_instance_id`, `TF_VAR_aws_region`,
 `TF_VAR_seasonal_state`, `-backend-config`), never committed. The state
 bucket's Region is its own: every root's `-backend-config` region is the
-bucket's, even where the instance is in another Region (dev).
+bucket's, whatever Region the instance is in.
 `prod-october` is a profile, not a root: it applies to `envs/prod`.
 
 ## Bootstrap
@@ -47,19 +47,25 @@ logs on, alias `hollow-hour-example-<environment>-<suffix>`) in that
 environment's Region, and one S3 bucket for every root's state (versioned,
 encrypted, public access blocked, `prevent_destroy`), locked by the S3
 backend's lock object rather than a DynamoDB table. The Regions default to
-this repository's own (dev `us-west-2`, qa and prod `us-east-1`, the bucket
-`us-east-1`); override them with `-var` or `TF_VAR_environments` and
+this repository's own (dev, qa, prod and the bucket all `us-east-1`; the
+Terraform-first repository keeps its three in `us-west-2`, so the two never
+share a Region); override them with `-var` or `TF_VAR_environments` and
 `TF_VAR_state_region`. Tier 1 needs no user, routing profile or security
 profile, so the root creates none.
 
 Check the instance quota first. The default is two per account and Region
-(VERIFY.md, H3):
+(VERIFY.md, H3), and the defaults put three instances in `us-east-1`, so
+this repository alone needs a quota of at least 3 there, plus any instances
+the account already has in that Region. Read both, and if the quota is
+short, request more (a larger increase "can take up to 3 weeks"):
 
 ```sh
 aws service-quotas get-service-quota --service-code connect \
-  --quota-code L-AA17A6B9 --region us-west-2
-aws connect list-instances --region us-west-2
-# and again for each Region an environment uses
+  --quota-code L-AA17A6B9 --region us-east-1
+aws connect list-instances --region us-east-1 \
+  --query 'length(InstanceSummaryList)'
+aws service-quotas request-service-quota-increase --service-code connect \
+  --quota-code L-AA17A6B9 --desired-value <existing + 3> --region us-east-1
 ```
 
 A new instance can also come up with a "Concurrent active calls per
@@ -137,6 +143,16 @@ instance before the apply. Once the others were ACTIVE, planning and
 applying again created qa. The other resources in the apply are unaffected,
 so run the migration below after the retry, not before.
 
+Replacing an instance under the same alias can be refused for a few minutes
+after the old one is deleted. On 2026-09-30, moving dev to `us-east-1`, the
+bootstrap apply replaced `aws_connect_instance.env["dev"]` (destroy, then
+create, with the alias unchanged), and the create was refused with
+`InvalidRequestException: Invalid Input. Instance alias is already used.`
+straight after the old instance was deleted. A few minutes later, once
+`aws connect list-instances` no longer listed the old instance, planning and
+applying again created it (1 added, in 1m8s). Wait, plan again and apply
+again; nothing else is needed.
+
 Confirm the state object is in the bucket too:
 
 ```sh
@@ -178,6 +194,39 @@ roots (the GitHub environments' `CONNECT_INSTANCE_ID` secret and
 `AWS_REGION` variable). `state_bucket` and `state_region` are every root's
 `-backend-config` bucket and region (the `TF_STATE_BUCKET` secret and the
 `TF_STATE_REGION` variable). None of them is committed.
+
+## Moving an environment to another Region
+
+Changing an environment's Region in `environments` replaces its instance
+(a new id, ARN and flow ids), and every resource the flow and seasonal
+roots created on the old instance would be left behind. Move it in this
+order, one step finishing before the next:
+
+1. With the old instance id and Region still exported, destroy the flow
+   root and then the seasonal root, as in [Teardown](#teardown), step 1.
+2. Change the environment's Region in `bootstrap/variables.tf` (or
+   `TF_VAR_environments`), check the new Region's instance quota (above),
+   and plan and apply the bootstrap root. The plan replaces that
+   environment's instance; if the create is refused with "Instance alias is
+   already used", wait a few minutes and plan and apply again (above).
+3. Set retention on the new `/aws/connect/<alias>` log group, and delete the
+   old one in the old Region, which no root manages.
+4. Export the new instance id and Region (and update the GitHub
+   environment's `CONNECT_INSTANCE_ID` secret and `AWS_REGION` variable),
+   then apply the seasonal root and then the flow root, each from a saved
+   plan.
+5. Rebuild the resource map, `node scenarios/resource-map.mjs <environment>`,
+   before `npm run drift` or a scenario run. A map built from the old
+   instance names its ARNs, so drift reports differences that are not there
+   (see [Checking drift](#checking-drift)).
+
+Observed on 2026-09-30, moving dev from `us-west-2` to `us-east-1`: the
+flow root destroyed 55 resources and the seasonal root 6; the bootstrap
+replacement was refused once with "Instance alias is already used" and
+succeeded on a re-plan and re-apply minutes later; the seasonal root added
+6 and the flow root 55. Afterwards `npm run drift` reported "No drift." on
+dev, qa and prod, and S2 passed on the new dev in about 103 s
+(VERIFY.md, R1).
 
 ## Teardown
 
@@ -261,8 +310,8 @@ before anyone approves anything. `apply` runs only when the dispatch checks
 `apply`: it waits for the environment's required reviewer (prod), downloads
 the exact saved plans and emitted files the `plan` job wrote, and applies
 the seasonal plan and then the flow plan. One deploy runs at a time across
-all three environments (one concurrency group, never cancelled): qa and
-prod share us-east-1's Connect API throttle.
+all three environments (one concurrency group, never cancelled): dev, qa
+and prod share us-east-1's Connect API throttle.
 
 Set it up once:
 
@@ -375,7 +424,10 @@ from the gitignored `.live/instances.json` (`{ "<environment>": { "id",
 reference moved to another resource is drift. A reference the map does not
 bind keeps its own identity (the token's key, or a short hash of the ARN), so
 two unmapped references never compare equal. Without the map, only its type is
-compared. An error message is printed with ARNs, ids and account ids redacted.
+compared. The map must come from the instance being checked: after dev's
+instance was replaced on 2026-09-30, a map left from the old instance made
+drift report 8 flows as different, and rebuilding it with
+`node scenarios/resource-map.mjs dev` gave "No drift.". An error message is printed with ARNs, ids and account ids redacted.
 `tests/drift.test.ts` holds the normalizer.
 
 Connect throttles these calls per account and Region, shared by every

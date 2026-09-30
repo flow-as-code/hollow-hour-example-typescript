@@ -40,9 +40,9 @@ describe("envs/bootstrap", () => {
     );
   });
 
-  it("puts dev, qa and prod in the Regions the owner chose", () => {
+  it("puts dev, qa and prod in us-east-1, the Region the owner chose", () => {
     expect(text).toMatch(
-      /default = \{\s*dev\s*= "us-west-2"\s*qa\s*= "us-east-1"\s*prod = "us-east-1"\s*\}/,
+      /default = \{\s*dev\s*= "us-east-1"\s*qa\s*= "us-east-1"\s*prod = "us-east-1"\s*\}/,
     );
   });
 

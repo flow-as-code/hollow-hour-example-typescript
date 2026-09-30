@@ -1,15 +1,20 @@
 # Regions are not secrets, so they have committed defaults: the ones this
-# repository's own environments use. Override them with -var or TF_VAR_<name>.
+# repository's own environments use, all three in us-east-1 (the
+# Terraform-first repository keeps its three in us-west-2, so the two never
+# share a Region). Override them with -var or TF_VAR_<name>.
 # The default quota is two Connect instances per account and Region
-# (VERIFY.md, H3): check `aws service-quotas get-service-quota --service-code
-# connect --quota-code L-AA17A6B9` and `aws connect list-instances` in each
-# Region before putting more than one environment there.
+# (VERIFY.md, H3), so these defaults need it raised to at least 3 in
+# us-east-1: check `aws service-quotas get-service-quota --service-code
+# connect --quota-code L-AA17A6B9` and `aws connect list-instances` there, and
+# request more with `request-service-quota-increase` (envs/README.md,
+# Bootstrap). Changing an environment's Region here replaces its instance;
+# see envs/README.md, "Moving an environment to another Region".
 
 variable "environments" {
   description = "Each environment and the Region its Connect instance lives in."
   type        = map(string)
   default = {
-    dev  = "us-west-2"
+    dev  = "us-east-1"
     qa   = "us-east-1"
     prod = "us-east-1"
   }
