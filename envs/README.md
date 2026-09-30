@@ -62,6 +62,34 @@ aws connect list-instances --region us-west-2
 # and again for each Region an environment uses
 ```
 
+A new instance can also come up with a "Concurrent active calls per
+instance" quota of 0, which the documentation gives as 10 by default. It is
+an instance-level quota, and a contact over it is refused; a
+`flow-cli simulate` test case counts. On 2026-09-30 the qa instance read 0.0
+while dev and prod read 10.0 (read again at 20:30 UTC), and S2 on qa failed to
+start with "Failed to start execution of test case due to limit reached."
+(VERIFY.md, S2). Read it for each instance, by the instance's ARN (from
+`aws connect describe-instance`, never committed), in the instance's Region:
+
+```sh
+aws service-quotas get-service-quota --service-code connect \
+  --quota-code L-12AB7C57 --context-id <instance arn> --region <region>
+```
+
+If it reads 0, request the default back and follow the request:
+
+```sh
+aws service-quotas request-service-quota-increase --service-code connect \
+  --quota-code L-12AB7C57 --context-id <instance arn> --desired-value 10 \
+  --region <region>
+aws service-quotas list-requested-service-quota-change-history-by-quota \
+  --service-code connect --quota-code L-12AB7C57 --region <region>
+```
+
+The qa request went to AWS Support as a case (status `CASE_OPENED`) rather
+than being applied on the spot, so allow for a wait
+([quotas](https://docs.aws.amazon.com/connect/latest/adminguide/amazon-connect-service-limits.html)).
+
 The first apply has no bucket to hold its state, so it runs on local state
 through a gitignored override, then moves that state into the bucket it has
 just created. It needs OpenTofu 1.10 or later (`use_lockfile`) installed as
