@@ -19,6 +19,7 @@ export default tseslint.config(
       "**/.vitest/**",
       "**/.terraform/**",
       ".claude/**",
+      ".live/**",
     ],
   },
   js.configs.recommended,

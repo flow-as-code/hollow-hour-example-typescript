@@ -32,6 +32,7 @@ const SKIP_DIRS = new Set([
   "coverage",
   ".git",
   ".claude",
+  ".live",
   ".vitest",
   ".terraform",
 ]);

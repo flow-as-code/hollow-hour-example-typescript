@@ -20,6 +20,8 @@ const SKIP_DIRS = new Set([
   ".tofu-cache",
   ".vitest",
   ".claude",
+  // Gitignored: the operator's live ids and the probe kit, never committed.
+  ".live",
 ]);
 // The lockfile is npm's; LICENSE is the Apache text verbatim.
 const SKIP_FILES = new Set(["package-lock.json", "LICENSE"]);

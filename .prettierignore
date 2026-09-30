@@ -14,3 +14,6 @@ seasonal/
 # Derived address maps are written by `npm run generate` in its own canonical
 # form and held to it by `npm run generate:check`.
 refs/*.tfmap.json
+
+# Gitignored operator scratch: live ids and the probe kit.
+.live/
