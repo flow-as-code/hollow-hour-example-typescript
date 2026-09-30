@@ -28,4 +28,30 @@ npx flow-cli simulate scenarios/ --instance "$DEV_INSTANCE_ARN" \
 
 `resource-map.mjs` resolves every key of `refs/<profile>.tfmap.json` against
 the flow root's state and adds `flow:<name>` for every deployed flow. It
-refuses to write the map when a key the scenarios use is missing.
+refuses to write the map when a key the scenarios use is missing. The
+`flow-cli simulate` step needs AWS credentials only; the Region is read from
+the instance ARN.
+
+## Writing a prompt expectation
+
+A voice `expect-prompt` is matched against a speech-to-text transcript of the
+prompt, not against the prompt's text. The match is case-insensitive, but the
+transcript does not keep the text's punctuation or its way of writing numbers.
+Observed on 2026-09-30 (UTC) in dev: "Have you heard it? Knocking, footsteps,
+..." came back as "Have you heard it knocking footsteps, ...", so an
+expectation of `Have you heard it?` never matched and the run timed out at 5
+minutes; "Press 1" came back as "press one" in some prompts and "Press 1" in
+others; "Where are you calling from? For Old Town, press 1." came back as
+"Where are you calling from for old town, press 1"; "could there be more"
+matched the expectation `Could there be more`. Expect a run of plain words
+from inside one sentence: no `?`, no commas, no digits.
+
+## Known service limits
+
+On 2026-09-30 (UTC) every qa run failed within 20 seconds with
+`INITIALIZATION_FAILURE: Failed to start execution of test case due to limit
+reached.` on all four attempts, and the instance recorded no contact. The qa
+instance's Service Quotas value "Concurrent active calls per instance",
+applied at the instance level, reads 0; dev's reads 10 and dev runs. A
+simulated voice contact is a call, so that quota is the likely cause, to be
+confirmed by a run after raising it.
