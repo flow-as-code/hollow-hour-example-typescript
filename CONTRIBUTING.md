@@ -48,8 +48,11 @@ the same version; `tests/packagePins.test.ts` holds that. Codegen output in
 
 ## Deploying
 
-`.github/workflows/deploy.yml`, dispatched by hand, one environment at a time.
-Each GitHub environment (`dev`, `qa`, `prod`) holds its own variables; `prod`
-requires a reviewer. The workflow header lists what to configure. Never apply
-two environments at once: the Connect API throttle is shared by every
-instance in an account and Region.
+`.github/workflows/deploy.yml`, dispatched by hand: an ungated plan job in the
+`<env>-plan` GitHub environment, then, when asked, an apply job in the `<env>`
+environment (`prod` requires a reviewer) that applies the saved plans. The
+role ARNs, the instance id and the bucket are environment secrets, never
+variables; [envs/README.md, Deploying from GitHub](envs/README.md#deploying-from-github)
+lists what to configure. One deploy runs at a time across every environment,
+and by hand never apply two environments at once either: the Connect API
+throttle is shared by every instance in an account and Region.

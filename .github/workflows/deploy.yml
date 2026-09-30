@@ -1,20 +1,33 @@
 name: deploy
 
-# Applies one environment to its own Amazon Connect instance. Dispatch only:
-# the Connect API throttle is shared with anything else in the account, and a
-# push must never reach a live instance.
+# Plans one environment and, when asked, applies those saved plans to its own
+# Amazon Connect instance. Dispatch only: the Connect API throttle is shared
+# with anything else in the account, and a push must never reach a live
+# instance.
 #
-# Set up once per GitHub environment (dev, qa, prod; prod with a required
-# reviewer, configured in the repository's environment settings):
-#   variables  AWS_DEPLOY_ROLE_ARN  an IAM role that trusts this repository's
-#                                   GitHub OIDC subject for that environment
-#              AWS_REGION           the instance's region
-#              CONNECT_INSTANCE_ID  the instance id (a UUID, masked in logs)
-#              TF_STATE_BUCKET      the S3 bucket holding this environment's state
-#              TF_STATE_REGION      that bucket's Region, which need not be the
-#                                   instance's (one bucket serves every
-#                                   environment; envs/bootstrap creates both)
-# None of them is written to a file, and the account id is masked.
+# Two jobs. `plan` runs in the <environment>-plan GitHub environment, which
+# has no reviewer: it runs the checks, emits, plans the seasonal root and
+# the flow root, and writes both plans to the run's summary before anyone is
+# asked to approve anything. `apply` runs in the <environment> environment
+# (prod has a required reviewer), downloads the exact plans and emitted
+# files `plan` wrote, and applies them, seasonal root first; it runs only
+# when `apply` is checked.
+#
+# Set up once (envs/README.md, "Deploying from GitHub"):
+#   repository secret        PLAN_ARTIFACT_KEY    a random passphrase that
+#                                                 encrypts the saved plans
+#                                                 between the two jobs
+#   <env>-plan environment   secret   AWS_PLAN_ROLE_ARN    a read-only role
+#   <env> environment        secret   AWS_DEPLOY_ROLE_ARN  the deploy role
+#   both                     secret   CONNECT_INSTANCE_ID  the instance id
+#                            secret   TF_STATE_BUCKET      the state bucket
+#                            variable AWS_REGION           the instance's Region
+#                            variable TF_STATE_REGION      the bucket's Region,
+#                                                          which need not be the
+#                                                          instance's
+# The role ARNs, the instance id and the bucket are secrets, not variables:
+# GitHub prints a step's with: and env: values in its log header before any
+# add-mask can run, and masks only secrets there. The account id is masked.
 #
 # Order: the seasonal root first (the greeting modules and their `live`
 # aliases), then the flow root, which reads the seasonal outputs.
@@ -33,37 +46,42 @@ on:
         options: [standard, october]
         default: standard
       apply:
-        description: Apply after planning. Unchecked, the run plans only.
+        description: Apply the saved plans (after approval, for prod). Unchecked, the run plans only.
         type: boolean
         default: false
 
 permissions:
   contents: read
 
-# One run per environment at a time, never cancelled halfway through an apply,
-# and separate from the provider repository's sandbox-acceptance group.
+# One deploy at a time across every environment, never cancelled halfway
+# through an apply: qa and prod share us-east-1 and its Connect API throttle.
+# Separate from the provider repository's sandbox-acceptance group.
 concurrency:
-  group: hollow-hour-example-${{ inputs.environment }}
+  group: hollow-hour-example-deploy
   cancel-in-progress: false
 
+env:
+  TF_IN_AUTOMATION: "1"
+  ENVIRONMENT: ${{ inputs.environment }}
+
 jobs:
-  deploy:
-    name: deploy / ${{ inputs.environment }}
+  plan:
+    name: plan / ${{ inputs.environment }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    environment: ${{ inputs.environment }}
+    timeout-minutes: 30
+    environment: ${{ inputs.environment }}-plan
     permissions:
       contents: read
       id-token: write
     env:
-      TF_IN_AUTOMATION: "1"
       TF_VAR_aws_region: ${{ vars.AWS_REGION }}
-      TF_VAR_connect_instance_id: ${{ vars.CONNECT_INSTANCE_ID }}
+      TF_VAR_connect_instance_id: ${{ secrets.CONNECT_INSTANCE_ID }}
+    outputs:
+      flows_planned: ${{ steps.seasonal.outputs.plan_flows }}
     steps:
       - name: Pick the profile
         id: profile
         env:
-          ENVIRONMENT: ${{ inputs.environment }}
           SEASON: ${{ inputs.season }}
         run: |
           set -euo pipefail
@@ -87,22 +105,20 @@ jobs:
           tofu_wrapper: false
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_PLAN_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
           mask-aws-account-id: true
       - name: Mask the instance id
         run: echo "::add-mask::${TF_VAR_connect_instance_id}"
       - run: npm ci
-      # The same gates a pull request passes, then the emit this run applies.
+      # The same gates a pull request passes, then the emit this run plans.
       - run: npm run check
       - run: npm run "emit:${{ steps.profile.outputs.name }}"
       - name: Seasonal root
         id: seasonal
         env:
-          ENVIRONMENT: ${{ inputs.environment }}
-          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
           TF_STATE_REGION: ${{ vars.TF_STATE_REGION }}
-          APPLY: ${{ inputs.apply }}
         run: |
           set -euo pipefail
           dir="envs/seasonal-$ENVIRONMENT"
@@ -112,27 +128,48 @@ jobs:
             -backend-config="region=$TF_STATE_REGION" \
             -backend-config="use_lockfile=true"
           tofu -chdir="$dir" plan -input=false -no-color -out=seasonal.tfplan
-          if [ "$APPLY" = true ]; then tofu -chdir="$dir" apply -input=false seasonal.tfplan; fi
           # The flow root reads this root's outputs through
-          # terraform_remote_state, so it cannot be planned until they exist.
+          # terraform_remote_state, so it cannot be planned until they exist,
+          # and a plan made while this plan still changes them would apply
+          # stale values.
           if [ -n "$(tofu -chdir="$dir" state list)" ]; then
             echo "applied=true" >> "$GITHUB_OUTPUT"
           else
             echo "applied=false" >> "$GITHUB_OUTPUT"
           fi
+          if tofu -chdir="$dir" show -json seasonal.tfplan \
+            | jq -e '[(.output_changes // {})[] | .actions[]] | all(. == "no-op")' >/dev/null; then
+            outputs_unchanged=true
+          else
+            outputs_unchanged=false
+          fi
+          if [ -n "$(tofu -chdir="$dir" state list)" ] && [ "$outputs_unchanged" = true ]; then
+            echo "plan_flows=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "plan_flows=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Refuse to plan the flow root before the first seasonal apply
-        if: steps.seasonal.outputs.applied != 'true'
+        if: steps.seasonal.outputs.plan_flows != 'true'
         env:
-          ENVIRONMENT: ${{ inputs.environment }}
-        run: |
-          echo "::error::envs/seasonal-$ENVIRONMENT has never been applied, so the flow root has no greeting outputs to read and cannot be planned. The seasonal plan above is what a first apply would create; dispatch again with apply checked to apply both roots in order." >&2
-          exit 1
-      - name: Flow root
-        env:
-          ENVIRONMENT: ${{ inputs.environment }}
-          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-          TF_STATE_REGION: ${{ vars.TF_STATE_REGION }}
           APPLY: ${{ inputs.apply }}
+          APPLIED: ${{ steps.seasonal.outputs.applied }}
+        run: |
+          if [ "$APPLIED" != true ]; then
+            why="envs/seasonal-$ENVIRONMENT has never been applied, so the flow root has no greeting outputs to read and cannot be planned."
+          else
+            why="The seasonal plan changes outputs the flow root reads, so a flow plan made now would apply stale values."
+          fi
+          if [ "$APPLY" = true ]; then
+            echo "::warning::$why This run applies the seasonal plan only; dispatch again afterwards to plan and apply the flow root."
+          else
+            echo "::error::$why The seasonal plan above is what an apply would do; dispatch with apply checked to apply it, then dispatch again for the flow root." >&2
+            exit 1
+          fi
+      - name: Flow root
+        if: steps.seasonal.outputs.plan_flows == 'true'
+        env:
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+          TF_STATE_REGION: ${{ vars.TF_STATE_REGION }}
         run: |
           set -euo pipefail
           export TF_VAR_seasonal_state="{bucket=\"$TF_STATE_BUCKET\",key=\"hollow-hour-example/$ENVIRONMENT/seasonal.tfstate\",region=\"$TF_STATE_REGION\"}"
@@ -143,4 +180,129 @@ jobs:
             -backend-config="region=$TF_STATE_REGION" \
             -backend-config="use_lockfile=true"
           tofu -chdir="$dir" plan -input=false -no-color -out=flows.tfplan
-          if [ "$APPLY" = true ]; then tofu -chdir="$dir" apply -input=false flows.tfplan; fi
+      # The job summary is not the log, so ids are redacted rather than
+      # relying on masks: every UUID, and every twelve-digit account id.
+      - name: Write the plans to the job summary
+        env:
+          PROFILE: ${{ steps.profile.outputs.name }}
+        run: |
+          set -euo pipefail
+          redact() {
+            sed -E -e 's/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/<uuid>/g' \
+              -e 's/(^|[^0-9])[0-9]{12}([^0-9]|$)/\1<account>\2/g' | head -c 450000
+          }
+          {
+            echo "## Plans: $PROFILE"
+            echo
+            echo "The apply job applies these saved plans, and only when the run was dispatched with apply checked."
+            echo
+            echo "### envs/seasonal-$ENVIRONMENT"
+            echo '```'
+            tofu -chdir="envs/seasonal-$ENVIRONMENT" show -no-color seasonal.tfplan | redact
+            echo '```'
+            echo "### envs/$ENVIRONMENT"
+            if [ -f "envs/$ENVIRONMENT/flows.tfplan" ]; then
+              echo '```'
+              tofu -chdir="envs/$ENVIRONMENT" show -no-color flows.tfplan | redact
+              echo '```'
+            else
+              echo "Not planned in this run (see the warning above)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      # The saved plans hold state values (ids, ARNs, the account id), and a
+      # public repository's artifacts can be downloaded by anyone, so they
+      # travel encrypted. With them go the emitted flows.tf of both roots and
+      # the Lambda zips archive_file wrote at plan time: the plans record their
+      # hashes, and apply reads the files.
+      - name: Pack and encrypt the plans
+        env:
+          PLAN_ARTIFACT_KEY: ${{ secrets.PLAN_ARTIFACT_KEY }}
+        run: |
+          set -euo pipefail
+          files=("envs/seasonal-$ENVIRONMENT/seasonal.tfplan" "envs/seasonal-$ENVIRONMENT/flows.tf" "envs/$ENVIRONMENT/flows.tf")
+          if [ -f "envs/$ENVIRONMENT/flows.tfplan" ]; then files+=("envs/$ENVIRONMENT/flows.tfplan"); fi
+          if [ -d "envs/$ENVIRONMENT/build" ]; then files+=("envs/$ENVIRONMENT/build"); fi
+          tar -czf "$RUNNER_TEMP/plans.tgz" "${files[@]}"
+          openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:PLAN_ARTIFACT_KEY \
+            -in "$RUNNER_TEMP/plans.tgz" -out "$RUNNER_TEMP/plans.tgz.enc"
+          rm "$RUNNER_TEMP/plans.tgz"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: plans-${{ inputs.environment }}
+          path: ${{ runner.temp }}/plans.tgz.enc
+          retention-days: 1
+          if-no-files-found: error
+
+  apply:
+    name: apply / ${{ inputs.environment }}
+    needs: plan
+    if: inputs.apply
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      CONNECT_INSTANCE_ID: ${{ secrets.CONNECT_INSTANCE_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ~1.10.0
+          tofu_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: true
+      - name: Mask the instance id
+        run: echo "::add-mask::${CONNECT_INSTANCE_ID}"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: plans-${{ inputs.environment }}
+          path: ${{ runner.temp }}
+      - name: Decrypt and unpack the plans
+        env:
+          PLAN_ARTIFACT_KEY: ${{ secrets.PLAN_ARTIFACT_KEY }}
+        run: |
+          set -euo pipefail
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass env:PLAN_ARTIFACT_KEY \
+            -in "$RUNNER_TEMP/plans.tgz.enc" -out "$RUNNER_TEMP/plans.tgz"
+          tar -xzf "$RUNNER_TEMP/plans.tgz"
+          rm "$RUNNER_TEMP/plans.tgz" "$RUNNER_TEMP/plans.tgz.enc"
+      # The saved plans, exactly as the plan job showed them. A saved plan
+      # that no longer matches state (another apply ran in between) is
+      # refused by tofu, not applied.
+      - name: Seasonal root
+        env:
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+          TF_STATE_REGION: ${{ vars.TF_STATE_REGION }}
+        run: |
+          set -euo pipefail
+          dir="envs/seasonal-$ENVIRONMENT"
+          tofu -chdir="$dir" init -input=false -lockfile=readonly \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="key=hollow-hour-example/$ENVIRONMENT/seasonal.tfstate" \
+            -backend-config="region=$TF_STATE_REGION" \
+            -backend-config="use_lockfile=true"
+          tofu -chdir="$dir" apply -input=false seasonal.tfplan
+      - name: Flow root
+        if: needs.plan.outputs.flows_planned == 'true'
+        env:
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+          TF_STATE_REGION: ${{ vars.TF_STATE_REGION }}
+        run: |
+          set -euo pipefail
+          dir="envs/$ENVIRONMENT"
+          tofu -chdir="$dir" init -input=false -lockfile=readonly \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="key=hollow-hour-example/$ENVIRONMENT/flows.tfstate" \
+            -backend-config="region=$TF_STATE_REGION" \
+            -backend-config="use_lockfile=true"
+          tofu -chdir="$dir" apply -input=false flows.tfplan
+      - name: Refuse to call a seasonal-only run a deploy
+        if: needs.plan.outputs.flows_planned != 'true'
+        run: |
+          echo "::error::Only envs/seasonal-$ENVIRONMENT was applied: the flow root could not be planned before it. Dispatch again to plan and apply the flow root." >&2
+          exit 1

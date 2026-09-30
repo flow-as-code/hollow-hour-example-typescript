@@ -152,7 +152,7 @@ clone, run the same `tofu init` with those four `-backend-config` values and
 no override.
 
 A fresh clone cannot read the bucket name from `tofu output`, because that
-reads the state the bucket holds. Keep it in the GitHub variable
+reads the state the bucket holds. Keep it in the GitHub secret
 `TF_STATE_BUCKET`, or find it again with:
 
 ```sh
@@ -174,10 +174,10 @@ aws logs put-retention-policy --log-group-name /aws/connect/<alias> \
 
 `tofu output instances` gives each environment's instance id and Region:
 `TF_VAR_connect_instance_id` and `TF_VAR_aws_region` for that environment's
-roots (the GitHub environment's `CONNECT_INSTANCE_ID` and `AWS_REGION`).
-`state_bucket` and `state_region` are every root's `-backend-config` bucket
-and region (`TF_STATE_BUCKET` and `TF_STATE_REGION`). None of them is
-committed.
+roots (the GitHub environments' `CONNECT_INSTANCE_ID` secret and
+`AWS_REGION` variable). `state_bucket` and `state_region` are every root's
+`-backend-config` bucket and region (the `TF_STATE_BUCKET` secret and the
+`TF_STATE_REGION` variable). None of them is committed.
 
 ## Teardown
 
@@ -251,10 +251,72 @@ In this order; each step needs the one before it to have finished.
 
 `tests/envBootstrap.test.ts` holds this order.
 
+## Deploying from GitHub
+
+`.github/workflows/deploy.yml`, dispatched by hand for one environment (and,
+for prod, a season), runs two jobs. `plan` runs the checks, emits the
+profile, plans the seasonal root and then the flow root, and writes both
+plans to the run's summary; it has no approval gate, so the plans are there
+before anyone approves anything. `apply` runs only when the dispatch checks
+`apply`: it waits for the environment's required reviewer (prod), downloads
+the exact saved plans and emitted files the `plan` job wrote, and applies
+the seasonal plan and then the flow plan. One deploy runs at a time across
+all three environments (one concurrency group, never cancelled): qa and
+prod share us-east-1's Connect API throttle.
+
+Set it up once:
+
+1. **Environments.** Create six GitHub environments: `dev`, `qa` and `prod`
+   for the apply job, and `dev-plan`, `qa-plan` and `prod-plan` for the plan
+   job. On every one, limit deployment branches to `main`. On `prod`, add a
+   required reviewer (and "Prevent self-review" when more than one person
+   can approve). The `-plan` environments get no reviewer; they exist so
+   the plan job can read its own secrets, which GitHub scopes to an
+   environment.
+2. **Roles.** Create IAM roles that trust GitHub's OIDC provider
+   ([GitHub's guide](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services)),
+   each for the subjects of its environments,
+   `repo:<owner>/<repository>:environment:<name>`: a read-only **plan role**
+   for the three `-plan` environments (reading what the roots manage, which
+   the AWS managed policy `ReadOnlyAccess` covers, the state objects under
+   `hollow-hour-example/` in the bucket, and writing and deleting their
+   `.tflock` lock objects, which a plan takes), and the **deploy role**
+   below for `dev`, `qa` and `prod`.
+3. **Secrets and variables.**
+
+   | Where                | Kind     | Name                  | Value                                                                                  |
+   | -------------------- | -------- | --------------------- | -------------------------------------------------------------------------------------- |
+   | repository           | secret   | `PLAN_ARTIFACT_KEY`   | a random passphrase (`openssl rand -base64 32`); encrypts the saved plans between jobs |
+   | each `<env>-plan`    | secret   | `AWS_PLAN_ROLE_ARN`   | the plan role's ARN                                                                    |
+   | each `<env>`         | secret   | `AWS_DEPLOY_ROLE_ARN` | the deploy role's ARN                                                                  |
+   | all six environments | secret   | `CONNECT_INSTANCE_ID` | that environment's instance id (`tofu -chdir=envs/bootstrap output instances`)         |
+   | all six environments | secret   | `TF_STATE_BUCKET`     | the state bucket                                                                       |
+   | all six environments | variable | `AWS_REGION`          | that environment's instance Region                                                     |
+   | all six environments | variable | `TF_STATE_REGION`     | the bucket's Region                                                                    |
+
+   The role ARNs, the instance id and the bucket are secrets, not
+   variables: GitHub prints each step's `with:` and `env:` values in the log
+   before any `add-mask` can run, and masks only secrets there. The Regions
+   are not sensitive.
+
+The saved plans hold state values (ids, ARNs, the account id), and anyone
+can download a public repository's artifacts, so they travel between the
+jobs encrypted with `PLAN_ARTIFACT_KEY`, kept for one day, together with
+the emitted `flows.tf` of both roots and the Lambda zips in
+`envs/<environment>/build/` that the flow plan records. The summary redacts
+every UUID and the account id.
+
+The flow plan is made from the seasonal root's current state. When the
+seasonal root has never been applied, or its plan changes an output the
+flow root reads, the flow root is not planned in that run: a plan-only run
+fails with the reason, and an apply run applies the seasonal plan and then
+fails with the same reason, so the next dispatch plans the flow root
+against the new outputs ([First apply](#first-apply)).
+
 ## The deploy role
 
-What `deploy.yml`'s role (or your own credentials) needs, by what the roots
-manage. Scope each statement to the environment's instance, the
+What `deploy.yml`'s deploy role (or your own credentials) needs, by what the
+roots manage. Scope each statement to the environment's instance, the
 `hh-<environment>-*` names and the state bucket; no account id, ARN or bucket
 name is written here, because none is ever committed.
 
@@ -278,9 +340,10 @@ resources the roots declare and has not yet been exercised by a live apply
 
 ## Deploying by hand
 
-The same sequence `deploy.yml` runs, for one environment: plan to a file,
-read the plan, then apply that saved plan, so what is applied is exactly
-what was reviewed. Never `apply -auto-approve`.
+The sequence `deploy.yml` runs, for one environment: plan to a file, read
+the plan, then apply that saved plan, so what is applied is exactly what was
+reviewed. Never `apply -auto-approve`. By hand, the flow root is planned
+after the seasonal apply, so it always reads the new outputs.
 
 ```sh
 npm run emit:<profile>
@@ -347,7 +410,9 @@ the CLI. This repository pins it as an exact devDependency (3.1144.0), which
 
 The flow root reads the greeting alias ARNs from the seasonal root's state
 (`seasonal.tf`), so the seasonal root must be applied before the flow root
-can even be planned. `deploy.yml` checks for that state after the seasonal
-step and refuses to plan the flow root without it; a first dispatch should
-have `apply` checked, which applies the seasonal root and then plans and
-applies the flow root in the same run.
+can even be planned. `deploy.yml`'s plan job checks for that state after the
+seasonal plan and refuses to plan the flow root without it. A first deploy
+is two dispatches with `apply` checked: the first applies the seasonal root
+and then fails on purpose, naming the flow root it could not plan; the
+second plans the flow root against the seasonal outputs and applies both
+(the seasonal plan is then empty).

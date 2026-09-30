@@ -213,7 +213,8 @@ Before the first deploy you need:
 
 The seasonal root must be **applied**, not just planned, before the flow root
 can be planned: the flow root reads the greeting alias ARNs from its state.
-`deploy.yml` refuses to plan the flow root until that has happened.
+`deploy.yml` refuses to plan the flow root until that has happened (a first
+deploy there is two dispatches; [envs/README.md, First apply](envs/README.md#first-apply)).
 
 ```sh
 # From `tofu -chdir=envs/bootstrap output`: dev's instance and Region, and
@@ -252,7 +253,10 @@ Terraform, init adds its own registry's entries, so review that diff and keep
 it out of a pull request.
 
 In this repository the same steps run from `.github/workflows/deploy.yml`,
-dispatched by hand, one environment at a time, with a reviewer on prod.
+dispatched by hand: a plan job with no gate that writes both plans to the
+run's summary, then, when asked, an apply job that waits for prod's reviewer
+and applies those saved plans. One deploy runs at a time across every
+environment ([envs/README.md, Deploying from GitHub](envs/README.md#deploying-from-github)).
 
 Supporting resources are named `hh-<environment>-*` and tagged
 `hollow-hour-example = true`; flows and modules carry the constant `hh-` prefix.
