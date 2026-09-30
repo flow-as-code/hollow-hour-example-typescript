@@ -102,19 +102,39 @@ the environment, never committed>` exits 0 for each; and scenario S2
         credentials, as a saved plan then apply, not through `deploy.yml`,
         which has never run; so the deploy role's action list is still not
         exercised.
-  - [ ] prod: pending the owner's apply.
+  - [x] prod applied to its own instance on 2026-09-30, at about 20:15 to
+        20:20 UTC, as a saved plan then apply, after the owner authorized it
+        for this demonstration: 6 resources added in the seasonal root and 55
+        in the flow root. By hand, like dev and qa, not through `deploy.yml`.
   - [ ] `flow-cli diff flows/ --instance <ARN>` exits 0: it does not. On dev
         it reported 8 of the 10 flows as changed only because 0.2.0 names a
         live reference after the physical resource (envs/README.md, Checking
         drift). `flow-cli diff seasonal/` exited 0. In its place,
         `npm run drift -- dev` and `npm run drift -- qa` each reported all 12
-        FlowDocs unchanged at 19:57 UTC. The criterion stays open until the
-        CLI can map references, or is amended to name the drift check.
+        FlowDocs unchanged at 19:57 UTC, and after the prod apply
+        `npm run drift -- qa` and `npm run drift -- prod` each reported "No
+        drift." A dev run then failed with "Too Many Requests" (Connect
+        throttling) and a re-run reported "No drift."; the check now paces
+        its calls and retries throttling, and at 20:29 UTC it reported "No
+        drift." on dev in 7 s (envs/README.md, Checking drift). The criterion
+        stays open until the CLI can map references, or is amended to name
+        the drift check.
   - [x] S2 passed as an operator run against dev with the stub Lambdas:
         19:48:20 to 19:50:00 UTC, exit 0, JUnit tests=1 failures=0 (VERIFY.md,
         S2). On qa it could not start ("Failed to start execution of test
         case due to limit reached."); the likely cause is the qa instance's
         "Concurrent active calls per instance" quota of 0.
+  - [x] S2 passed on prod, with the resource map from
+        `node scenarios/resource-map.mjs prod` (27 references), at
+        2026-09-30T20:24:33Z: JUnit tests=1 failures=0 errors=0, 101.218 s.
+        The map script also printed that the prod state lacks
+        `prompt:salt-line-tips (awscc_connect_prompt.salt_line_tips.prompt_arn)`.
+        That is its report of a map key with no resource yet: the prompt is
+        a Tier 2 resource (refs/manifest.json), no scenario uses it, and the
+        map was written.
+  - [ ] S2 on qa: the instance quota reads 0.0 (dev and prod read 10.0,
+        rechecked at 20:30 UTC). An increase to 10 was requested and is an
+        open AWS Support case (envs/README.md, Bootstrap).
 
 ## Assumptions
 
@@ -136,16 +156,16 @@ Each item is recorded, dated, in `VERIFY.md` (status
 - [ ] Owner setup: `envs/bootstrap` is applied (done); the OIDC deploy role
       per environment and the GitHub environments' variables, with a
       reviewer on prod, are not yet in place.
-- [ ] Dispatch `deploy.yml` with `apply` for dev, then qa, then prod. dev
-      and qa were applied by hand instead; prod is pending. From the dev
+- [ ] Dispatch `deploy.yml` with `apply` for dev, then qa, then prod. All
+      three were applied by hand instead, prod on 2026-09-30. From the dev
       apply and the probes on dev: H1, H2, 7b, L2, L3 and I5 are recorded
       (I5: 5 accepted, so `moving` keeps it); the apply also found C1 (the
       Compare NextAction). Q2 (the queue cap) is not recorded.
 - [ ] `flow-cli diff flows/ --instance <ARN from the environment>` exits 0
       for each environment: not while 0.2.0 names references after the
-      physical resource; `npm run drift` is clean on dev and qa.
-- [x] Run S2 against dev: passed; S2 and L1 are recorded. qa: not started
-      by the service (the call quota above).
+      physical resource; `npm run drift` is clean on dev, qa and prod.
+- [x] Run S2 against dev: passed; S2 and L1 are recorded. prod: passed
+      2026-09-30. qa: not started by the service (the call quota above).
 - [ ] Fill a dev crew queue with two test contacts and place a third call to
       hear the overflow to the sibling crew, and a move from the queue flow;
       record Q1 (which queue flow plays after the dequeue).
