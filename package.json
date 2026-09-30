@@ -21,7 +21,8 @@
     "format": "prettier --write .",
     "headers": "node scripts/license-headers.mjs",
     "headers:fix": "node scripts/license-headers.mjs --fix",
-    "check": "npm run lint && npm run typecheck && npm run generate:check && npm run lint:flows && npm test"
+    "check": "npm run lint && npm run typecheck && npm run generate:check && npm run lint:flows && npm test",
+    "drift": "node scripts/drift.mjs"
   },
   "devDependencies": {
     "@aws-sdk/client-connect": "3.1144.0",

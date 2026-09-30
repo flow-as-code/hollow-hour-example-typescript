@@ -7,7 +7,7 @@
 // existing ghost-removal fiction or retired by the owner's rename.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { extname, join, relative } from "node:path";
+import { extname, join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -25,12 +25,18 @@ const SKIP_DIRS = new Set([
 ]);
 // The lockfile is npm's; LICENSE is the Apache text verbatim.
 const SKIP_FILES = new Set(["package-lock.json", "LICENSE"]);
+// Gitignored: scenarios/<profile>.resources.json holds the deployed ARNs a
+// simulate run and `npm run drift` read; it never leaves the operator's machine.
+// Matched against the path relative to the root, so a file of that name
+// anywhere else is still scanned.
+const RESOURCE_MAP = /^scenarios\/[\w-]+\.resources\.json$/;
 const TEXT = new Set([".md", ".json", ".ts", ".mjs", ".js", ".tf", ".yml", ".yaml", ""]);
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
     if (SKIP_DIRS.has(entry) || SKIP_FILES.has(entry)) continue;
     const full = join(dir, entry);
+    if (RESOURCE_MAP.test(relative(ROOT, full).split(sep).join("/"))) continue;
     if (statSync(full).isDirectory()) walk(full, out);
     else if (TEXT.has(extname(entry)) || entry.startsWith(".")) out.push(full);
   }
