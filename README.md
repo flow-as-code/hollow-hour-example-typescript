@@ -7,12 +7,13 @@ typed TypeScript companions, deployed to three environments on three Connect
 instances, where every difference between those environments, the Halloween
 season included, is a reference binding rather than an edit to a flow.
 
-> Status: **Tier 1 live in dev and qa** (task T1, 2026-09-30). The bootstrap
-> root created the three instances and the state bucket, and dev and qa are
-> applied: 6 resources in each seasonal root and 55 in each flow root, with
+> Status: **Tier 1 live in dev, qa and prod** (task T1, 2026-09-30). The
+> bootstrap root created the three instances and the state bucket, and each
+> environment is applied: 6 resources in each seasonal root and 55 in each
+> flow root, dev and qa earlier that day and prod at about 20:20 UTC, with
 > every FlowDoc matching what is live (`npm run drift`). Scenario S2 passed on
-> dev; on qa it could not start (VERIFY.md, S2). prod is pending the owner's
-> apply. See [Tiers and status](#tiers-and-status).
+> dev and on prod; on qa it waits on a quota increase for the instance's
+> concurrent calls (VERIFY.md, S2). See [Tiers and status](#tiers-and-status).
 >
 > The deploy found that Amazon Connect refuses a Compare with no
 > `Transitions.NextAction`, which flow-as-code 0.2.0's typed Compare does not
@@ -275,12 +276,12 @@ instance yet.
 
 ## Tiers and status
 
-| Tier | Name          | Scope                                                                                                                                                        | Status                           |
-| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
-| T0   | Scaffold      | Layout, toolchain, CI, environment roots, reference manifest, VERIFY.md                                                                                      | done; owner setup open           |
-| T1   | First night   | Main line with keypad triage and interview, generated district and queue flows, whispers, seasonal greetings, supporting resources in all three environments | live in dev and qa; prod pending |
-| T2   | Full moon     | Address and callback modules, holds, prank screen, the Queue of the Dead, scenarios                                                                          | not started                      |
-| T3   | Witching hour | Chat field guide, outbound follow-ups, transfers to named crew, the drift scene                                                                              | after the season                 |
+| Tier | Name          | Scope                                                                                                                                                        | Status                                                                 |
+| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| T0   | Scaffold      | Layout, toolchain, CI, environment roots, reference manifest, VERIFY.md                                                                                      | done; owner setup open                                                 |
+| T1   | First night   | Main line with keypad triage and interview, generated district and queue flows, whispers, seasonal greetings, supporting resources in all three environments | live in dev, qa and prod (2026-09-30); qa S2 waits on a quota increase |
+| T2   | Full moon     | Address and callback modules, holds, prank screen, the Queue of the Dead, scenarios                                                                          | not started                                                            |
+| T3   | Witching hour | Chat field guide, outbound follow-ups, transfers to named crew, the drift scene                                                                              | after the season                                                       |
 
 Each tier's acceptance criteria are in [`tasks/`](tasks/).
 
