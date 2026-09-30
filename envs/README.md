@@ -278,6 +278,17 @@ two unmapped references never compare equal. Without the map, only its type is
 compared. An error message is printed with ARNs, ids and account ids redacted.
 `tests/drift.test.ts` holds the normalizer.
 
+Connect throttles these calls per account and Region, shared by every
+instance and caller there: 2 requests per second, burst 5
+([API throttling quotas](https://docs.aws.amazon.com/connect/latest/adminguide/amazon-connect-service-limits.html#connect-api-quotas)).
+On 2026-09-30 a dev run failed with "Too Many Requests". The check now
+spaces its calls 500 ms apart and retries a throttling refusal
+(`TooManyRequestsException`, `ThrottlingException` or HTTP 429) up to six
+times, with exponential backoff from 1 s capped at 20 s and full jitter,
+printing each retry; `tests/drift.test.ts` holds that against a stubbed
+client. At 20:29 UTC the same day the paced check ran on dev in 7 s and
+reported "No drift.".
+
 Use it instead of `flow-cli diff flows/ --instance <ARN>` for now. The
 0.2.0 CLI turns each live ARN into a token named after the physical
 resource (`queue:hh-dev-old-town-crew`) while the FlowDocs use the logical

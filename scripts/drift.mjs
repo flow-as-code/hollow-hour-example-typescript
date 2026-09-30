@@ -35,6 +35,16 @@
 // ListContactFlows, ListContactFlowModules, DescribeContactFlow and
 // DescribeContactFlowModule.
 //
+// Those calls share one throttle bucket per account and Region, whatever the
+// instance or caller: 2 requests per second with a burst of 5 for these
+// operations (https://docs.aws.amazon.com/connect/latest/adminguide/amazon-connect-service-limits.html#connect-api-quotas).
+// On 2026-09-30 a dev run was refused with "Too Many Requests". So every
+// call goes through `pacedSender`: at most one request per PACE_MS, and a
+// throttling refusal (TooManyRequestsException, ThrottlingException, HTTP 429)
+// is retried with capped exponential backoff and full jitter, up to RETRIES
+// times, before the error is reported. The SDK's own retries stay as they are
+// underneath; this is the outer bound.
+//
 // The instance comes from TF_VAR_connect_instance_id and TF_VAR_aws_region
 // (what a deploy exports), else from the gitignored .live/instances.json,
 // keyed by environment: { "<environment>": { "id": ..., "region": ... } }.
@@ -137,6 +147,85 @@ export function normalize(value, map) {
     return v;
   };
   return walk(value);
+}
+
+/** Minimum spacing between two Connect calls: the documented 2 per second. */
+export const PACE_MS = 500;
+/** Throttling retries after the first attempt. */
+export const RETRIES = 6;
+/** First backoff ceiling and the cap on any one backoff, in ms. */
+export const BACKOFF_BASE_MS = 1000;
+export const BACKOFF_MAX_MS = 20000;
+
+/**
+ * Whether an SDK error is Connect refusing a call for its rate.
+ * @param {unknown} err
+ */
+export function isThrottle(err) {
+  if (err === null || typeof err !== "object") return false;
+  const e =
+    /** @type {{ name?: unknown, $metadata?: { httpStatusCode?: unknown }, message?: unknown }} */ (
+      err
+    );
+  return (
+    e.name === "TooManyRequestsException" ||
+    e.name === "ThrottlingException" ||
+    e.$metadata?.httpStatusCode === 429 ||
+    (typeof e.message === "string" && /too many requests/i.test(e.message))
+  );
+}
+
+/**
+ * The wait before retry `attempt` (0 for the first retry): full jitter over
+ * a ceiling that doubles from `base` and stops at `max`.
+ * @param {number} attempt
+ * @param {{ base?: number, max?: number, random?: () => number }} [options]
+ */
+export function backoffMs(attempt, options = {}) {
+  const { base = BACKOFF_BASE_MS, max = BACKOFF_MAX_MS, random = Math.random } = options;
+  return Math.floor(random() * Math.min(max, base * 2 ** attempt));
+}
+
+/**
+ * A runner that spaces calls at least `paceMs` apart and retries a
+ * throttling refusal up to `retries` times with `backoffMs`. Any other error,
+ * and the last throttling one, is thrown as it came. Each call is a thunk,
+ * `paced(() => client.send(command))`, so the SDK's types carry through.
+ * @param {{ paceMs?: number, retries?: number, base?: number, max?: number,
+ *   random?: () => number, sleep?: (ms: number) => Promise<void>, now?: () => number,
+ *   onRetry?: (attempt: number, waitMs: number) => void }} [options]
+ * @returns {<T>(call: () => Promise<T>) => Promise<T>}
+ */
+export function pacedSender(options = {}) {
+  const {
+    paceMs = PACE_MS,
+    retries = RETRIES,
+    base,
+    max,
+    random,
+    sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)),
+    now = Date.now,
+    onRetry,
+  } = options;
+  let last = -Infinity;
+  const pace = async () => {
+    const wait = last + paceMs - now();
+    if (wait > 0) await sleep(wait);
+    last = now();
+  };
+  return async (call) => {
+    for (let attempt = 0; ; attempt++) {
+      await pace();
+      try {
+        return await call();
+      } catch (err) {
+        if (!isThrottle(err) || attempt >= retries) throw err;
+        const wait = backoffMs(attempt, { base, max, random });
+        onRetry?.(attempt + 1, wait);
+        await sleep(wait);
+      }
+    }
+  };
 }
 
 const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
@@ -250,14 +339,18 @@ async function main(profile) {
 
   const sdk = await import("@aws-sdk/client-connect");
   const client = new sdk.ConnectClient({ region });
+  const paced = pacedSender({
+    onRetry: (n, ms) =>
+      console.error(`Throttled by Connect; retry ${n} of ${RETRIES} in ${ms} ms.`),
+  });
 
   /** @type {Map<string, string>} */
   const flows = new Map();
   /** @type {string | undefined} */
   let next;
   do {
-    const page = await client.send(
-      new sdk.ListContactFlowsCommand({ InstanceId: id, NextToken: next }),
+    const page = await paced(() =>
+      client.send(new sdk.ListContactFlowsCommand({ InstanceId: id, NextToken: next })),
     );
     for (const f of page.ContactFlowSummaryList ?? []) {
       if (f.Name && f.Id) flows.set(f.Name, f.Id);
@@ -269,8 +362,8 @@ async function main(profile) {
   /** @type {string | undefined} */
   let nextModule;
   do {
-    const page = await client.send(
-      new sdk.ListContactFlowModulesCommand({ InstanceId: id, NextToken: nextModule }),
+    const page = await paced(() =>
+      client.send(new sdk.ListContactFlowModulesCommand({ InstanceId: id, NextToken: nextModule })),
     );
     for (const m of page.ContactFlowModulesSummaryList ?? []) {
       if (m.Name && m.Id) modules.set(m.Name, m.Id);
@@ -295,16 +388,20 @@ async function main(profile) {
       }
       const content = isModule
         ? (
-            await client.send(
-              new sdk.DescribeContactFlowModuleCommand({
-                InstanceId: id,
-                ContactFlowModuleId: liveId,
-              }),
+            await paced(() =>
+              client.send(
+                new sdk.DescribeContactFlowModuleCommand({
+                  InstanceId: id,
+                  ContactFlowModuleId: liveId,
+                }),
+              ),
             )
           ).ContactFlowModule?.Content
         : (
-            await client.send(
-              new sdk.DescribeContactFlowCommand({ InstanceId: id, ContactFlowId: liveId }),
+            await paced(() =>
+              client.send(
+                new sdk.DescribeContactFlowCommand({ InstanceId: id, ContactFlowId: liveId }),
+              ),
             )
           ).ContactFlow?.Content;
       const found = compareContent(doc.content, JSON.parse(content ?? "{}"), map);

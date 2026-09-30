@@ -7,7 +7,15 @@
 // the token after the physical resource). No AWS call is made here.
 
 import { describe, expect, it } from "vitest";
-import { arnType, compareContent, normalize, redact } from "../scripts/drift.mjs";
+import {
+  arnType,
+  backoffMs,
+  compareContent,
+  isThrottle,
+  normalize,
+  pacedSender,
+  redact,
+} from "../scripts/drift.mjs";
 
 // Made-up ARNs, built from parts, with a short fake account.
 const prefix = ["arn", "aws"].join(":");
@@ -127,5 +135,101 @@ describe("drift comparison", () => {
     expect(compareContent(flow("${cdref:queue:old-town-crew}"), moved, map)).toEqual([
       "StartAction: local to-queue, live done",
     ]);
+  });
+});
+
+// A fake clock: sleep advances it, so pacing and backoff are observable
+// without waiting.
+function clock() {
+  let t = 0;
+  const sleeps: number[] = [];
+  return {
+    now: () => t,
+    sleep: async (ms: number) => {
+      sleeps.push(ms);
+      t += ms;
+    },
+    sleeps,
+  };
+}
+
+const throttle = (name = "TooManyRequestsException") =>
+  Object.assign(new Error("Too Many Requests"), { name, $metadata: { httpStatusCode: 429 } });
+
+/** A client that fails with each error in `failures`, then answers `ok`. */
+function stub(failures: Error[]) {
+  const calls: { at: number; command: unknown }[] = [];
+  const c = clock();
+  const client = {
+    send: async (command: unknown) => {
+      calls.push({ at: c.now(), command });
+      const next = failures.shift();
+      if (next !== undefined) throw next;
+      return { ok: command };
+    },
+  };
+  return { client, calls, c };
+}
+
+describe("drift pacing and throttling retries", () => {
+  it("recognizes Connect's throttling refusals and nothing else", () => {
+    expect(isThrottle(throttle())).toBe(true);
+    expect(isThrottle(Object.assign(new Error("x"), { name: "ThrottlingException" }))).toBe(true);
+    expect(isThrottle(Object.assign(new Error("x"), { $metadata: { httpStatusCode: 429 } }))).toBe(
+      true,
+    );
+    expect(isThrottle(new Error("Too Many Requests"))).toBe(true);
+    expect(isThrottle(Object.assign(new Error("no"), { name: "AccessDeniedException" }))).toBe(
+      false,
+    );
+    expect(isThrottle(undefined)).toBe(false);
+  });
+
+  it("backs off exponentially under a cap, with full jitter", () => {
+    const top = () => 0.999999;
+    expect([0, 1, 2, 3, 4, 5, 6].map((a) => backoffMs(a, { random: top }))).toEqual([
+      999, 1999, 3999, 7999, 15999, 19999, 19999,
+    ]);
+    expect(backoffMs(3, { random: () => 0 })).toBe(0);
+    expect(backoffMs(1, { base: 100, max: 150, random: () => 0.5 })).toBe(75);
+  });
+
+  it("retries a throttled call until it succeeds", async () => {
+    const { client, calls, c } = stub([throttle(), throttle("ThrottlingException")]);
+    const retries: number[] = [];
+    const paced = pacedSender({
+      ...c,
+      random: () => 0.5,
+      onRetry: (n) => retries.push(n),
+    });
+    await expect(paced(() => client.send("describe"))).resolves.toEqual({ ok: "describe" });
+    expect(calls).toHaveLength(3);
+    expect(retries).toEqual([1, 2]);
+    // Backoffs 500 then 1000 (half of 1 s, then of 2 s); no pacing wait is
+    // needed once a backoff has already spaced the calls.
+    expect(c.sleeps).toEqual([500, 1000]);
+  });
+
+  it("gives up after the bounded retries and throws the last refusal", async () => {
+    const { client, calls, c } = stub(Array.from({ length: 10 }, () => throttle()));
+    const paced = pacedSender({ ...c, retries: 3, random: () => 0 });
+    await expect(paced(() => client.send("list"))).rejects.toThrow("Too Many Requests");
+    expect(calls).toHaveLength(4);
+  });
+
+  it("does not retry any other error", async () => {
+    const denied = Object.assign(new Error("denied"), { name: "AccessDeniedException" });
+    const { client, calls, c } = stub([denied]);
+    const paced = pacedSender(c);
+    await expect(paced(() => client.send("list"))).rejects.toBe(denied);
+    expect(calls).toHaveLength(1);
+    expect(c.sleeps).toEqual([]);
+  });
+
+  it("spaces calls at least the pace apart", async () => {
+    const { client, calls, c } = stub([]);
+    const paced = pacedSender({ ...c, paceMs: 500 });
+    for (const cmd of ["a", "b", "c"]) await paced(() => client.send(cmd));
+    expect(calls.map((x) => x.at)).toEqual([0, 500, 1000]);
   });
 });
