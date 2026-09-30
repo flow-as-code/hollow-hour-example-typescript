@@ -211,9 +211,10 @@ describe("drift pacing and throttling retries", () => {
   });
 
   it("gives up after the bounded retries and throws the last refusal", async () => {
-    const { client, calls, c } = stub(Array.from({ length: 10 }, () => throttle()));
+    const refusals = Array.from({ length: 10 }, () => throttle());
+    const { client, calls, c } = stub([...refusals]);
     const paced = pacedSender({ ...c, retries: 3, random: () => 0 });
-    await expect(paced(() => client.send("list"))).rejects.toThrow("Too Many Requests");
+    await expect(paced(() => client.send("list"))).rejects.toBe(refusals[3]);
     expect(calls).toHaveLength(4);
   });
 
