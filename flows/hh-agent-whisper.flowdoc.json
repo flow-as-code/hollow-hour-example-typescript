@@ -1,0 +1,52 @@
+{
+  "flowdoc": "0.2",
+  "kind": "flow",
+  "name": "hh-agent-whisper",
+  "description": "What the crew hears before the caller joins: district, grade name and the advice already given. Reads contact attributes only.",
+  "connectType": "AGENT_WHISPER",
+  "content": {
+    "Version": "2019-10-30",
+    "StartAction": "brief-the-crew",
+    "Actions": [
+      {
+        "Identifier": "brief-the-crew",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "$.Attributes.districtName call. Grade: $.Attributes.gradeName. Advice given: $.Attributes.advice"
+        },
+        "Transitions": {
+          "NextAction": "done",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "done"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "done",
+        "Type": "EndFlowExecution",
+        "Parameters": {},
+        "Transitions": {}
+      }
+    ]
+  },
+  "layout": {
+    "brief-the-crew": {
+      "x": 20,
+      "y": 20
+    },
+    "done": {
+      "x": 280,
+      "y": 20
+    }
+  },
+  "refs": [],
+  "meta": {
+    "generator": "cli@0.2.0",
+    "sourceHash": "sha256:9ad4ca22a376a1b0824461092379680840072821f3cde008a5f00e78dbb51824",
+    "sourceKind": "ts"
+  }
+}

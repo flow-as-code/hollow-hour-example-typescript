@@ -1,0 +1,660 @@
+{
+  "flowdoc": "0.2",
+  "kind": "flow",
+  "name": "hh-district-graveyard-hill",
+  "description": "Dispatch for Graveyard Hill. Generated from districts.config.json by generators/districts.ts; edit the config, not this flow.",
+  "connectType": "CONTACT_FLOW",
+  "content": {
+    "Version": "2019-10-30",
+    "StartAction": "set-crew-queue",
+    "Actions": [
+      {
+        "Identifier": "set-crew-queue",
+        "Type": "UpdateContactTargetQueue",
+        "Parameters": {
+          "QueueId": "${cdref:queue:graveyard-hill-crew}"
+        },
+        "Transitions": {
+          "NextAction": "set-customer-whisper",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hand-to-dispatch"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-customer-whisper",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "CustomerWhisper": "${cdref:flow:hh-customer-whisper}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-agent-whisper",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-agent-whisper"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-agent-whisper",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "AgentWhisper": "${cdref:flow:hh-agent-whisper}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-queue-experience",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-queue-experience"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-queue-experience",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "CustomerQueue": "${cdref:flow:hh-queue-experience-graveyard-hill}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "note-overflow-crew",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "note-overflow-crew"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "note-overflow-crew",
+        "Type": "UpdateFlowAttributes",
+        "Parameters": {
+          "FlowAttributes": {
+            "overflowCrew": {
+              "Value": "Old Town"
+            }
+          }
+        },
+        "Transitions": {
+          "NextAction": "check-hours",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "check-hours"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "check-hours",
+        "Type": "CheckHoursOfOperation",
+        "Parameters": {
+          "HoursOfOperationId": "${cdref:hours:graveyard-hill}"
+        },
+        "Transitions": {
+          "NextAction": "after-hours",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "check-staffing"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "check-staffing",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "True"
+                ]
+              }
+            },
+            {
+              "NextAction": "after-hours",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "False"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "check-staffing",
+        "Type": "CheckMetricData",
+        "Parameters": {
+          "MetricType": "NumberOfAgentsAvailable",
+          "QueueId": "${cdref:queue:graveyard-hill-crew}"
+        },
+        "Transitions": {
+          "NextAction": "transfer-to-crew",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "transfer-to-crew"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "read-queue"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "crew-ready",
+              "Condition": {
+                "Operator": "NumberGreaterThan",
+                "Operands": [
+                  "0"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "crew-ready",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "The Graveyard Hill crew has someone free. Connecting you now."
+        },
+        "Transitions": {
+          "NextAction": "transfer-to-crew",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "transfer-to-crew"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "read-queue",
+        "Type": "GetMetricData",
+        "Parameters": {
+          "QueueId": "${cdref:queue:graveyard-hill-crew}"
+        },
+        "Transitions": {
+          "NextAction": "announce-line",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "transfer-to-crew"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "announce-line",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "The Graveyard Hill crew is out on calls. Callers ahead of you: $.Metrics.Queue.Size. Stay on the line and we will keep your place."
+        },
+        "Transitions": {
+          "NextAction": "transfer-to-crew",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "transfer-to-crew"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "transfer-to-crew",
+        "Type": "TransferContactToQueue",
+        "Parameters": {},
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "QueueAtCapacity",
+              "NextAction": "crew-full"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "crew-full",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "The Graveyard Hill crew is full tonight. Moving you to the $.FlowAttributes.overflowCrew crew."
+        },
+        "Transitions": {
+          "NextAction": "note-overflow-district",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "note-overflow-district"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "note-overflow-district",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "district": "old-town",
+            "districtName": "Old Town"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "set-overflow-queue-experience",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-overflow-queue-experience"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-overflow-queue-experience",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "CustomerQueue": "${cdref:flow:hh-queue-experience-old-town}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-overflow-queue",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-overflow-queue"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-overflow-queue",
+        "Type": "UpdateContactTargetQueue",
+        "Parameters": {
+          "QueueId": "${cdref:queue:old-town-crew}"
+        },
+        "Transitions": {
+          "NextAction": "transfer-to-overflow",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "transfer-to-overflow",
+        "Type": "TransferContactToQueue",
+        "Parameters": {},
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "QueueAtCapacity",
+              "NextAction": "lines-busy"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "after-hours",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "The Graveyard Hill crew is off shift right now. Night crews start at 4 in the afternoon. If anyone is hurt or in danger, call your local emergency number (911 in the US)."
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hang-up"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "hand-to-dispatch",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Let me put you through to a dispatcher."
+        },
+        "Transitions": {
+          "NextAction": "note-dispatch",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "note-dispatch"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "note-dispatch",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "districtName": "Dispatch"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "set-dispatch-customer-whisper",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-customer-whisper"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-customer-whisper",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "CustomerWhisper": "${cdref:flow:hh-customer-whisper}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-dispatch-agent-whisper",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-agent-whisper"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-agent-whisper",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "AgentWhisper": "${cdref:flow:hh-agent-whisper}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-dispatch-queue",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-queue"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-queue",
+        "Type": "UpdateContactTargetQueue",
+        "Parameters": {
+          "QueueId": "${cdref:queue:dispatch-overflow}"
+        },
+        "Transitions": {
+          "NextAction": "transfer-to-dispatch",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "transfer-to-dispatch",
+        "Type": "TransferContactToQueue",
+        "Parameters": {},
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "QueueAtCapacity",
+              "NextAction": "lines-busy"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "lines-busy",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Every crew is out on a call. Please call back in a few minutes."
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hang-up"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "apologize",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Something went wrong on our side. Please call back in a few minutes."
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hang-up"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "hang-up",
+        "Type": "DisconnectParticipant",
+        "Parameters": {},
+        "Transitions": {}
+      }
+    ]
+  },
+  "layout": {
+    "after-hours": {
+      "x": 1580,
+      "y": 20
+    },
+    "announce-line": {
+      "x": 2100,
+      "y": 20
+    },
+    "apologize": {
+      "x": 3920,
+      "y": 120
+    },
+    "check-hours": {
+      "x": 1320,
+      "y": 20
+    },
+    "check-staffing": {
+      "x": 1580,
+      "y": 120
+    },
+    "crew-full": {
+      "x": 2620,
+      "y": 20
+    },
+    "crew-ready": {
+      "x": 1840,
+      "y": 120
+    },
+    "hand-to-dispatch": {
+      "x": 280,
+      "y": 120
+    },
+    "hang-up": {
+      "x": 4180,
+      "y": 20
+    },
+    "lines-busy": {
+      "x": 3920,
+      "y": 20
+    },
+    "note-dispatch": {
+      "x": 540,
+      "y": 120
+    },
+    "note-overflow-crew": {
+      "x": 1060,
+      "y": 20
+    },
+    "note-overflow-district": {
+      "x": 2880,
+      "y": 20
+    },
+    "read-queue": {
+      "x": 1840,
+      "y": 20
+    },
+    "set-agent-whisper": {
+      "x": 540,
+      "y": 20
+    },
+    "set-crew-queue": {
+      "x": 20,
+      "y": 20
+    },
+    "set-customer-whisper": {
+      "x": 280,
+      "y": 20
+    },
+    "set-dispatch-agent-whisper": {
+      "x": 1060,
+      "y": 120
+    },
+    "set-dispatch-customer-whisper": {
+      "x": 800,
+      "y": 120
+    },
+    "set-dispatch-queue": {
+      "x": 1320,
+      "y": 120
+    },
+    "set-overflow-queue": {
+      "x": 3400,
+      "y": 20
+    },
+    "set-overflow-queue-experience": {
+      "x": 3140,
+      "y": 20
+    },
+    "set-queue-experience": {
+      "x": 800,
+      "y": 20
+    },
+    "transfer-to-crew": {
+      "x": 2360,
+      "y": 20
+    },
+    "transfer-to-dispatch": {
+      "x": 1580,
+      "y": 220
+    },
+    "transfer-to-overflow": {
+      "x": 3660,
+      "y": 20
+    }
+  },
+  "refs": [
+    {
+      "token": "${cdref:flow:hh-agent-whisper}",
+      "type": "flow",
+      "name": "hh-agent-whisper"
+    },
+    {
+      "token": "${cdref:flow:hh-customer-whisper}",
+      "type": "flow",
+      "name": "hh-customer-whisper"
+    },
+    {
+      "token": "${cdref:flow:hh-queue-experience-graveyard-hill}",
+      "type": "flow",
+      "name": "hh-queue-experience-graveyard-hill"
+    },
+    {
+      "token": "${cdref:flow:hh-queue-experience-old-town}",
+      "type": "flow",
+      "name": "hh-queue-experience-old-town"
+    },
+    {
+      "token": "${cdref:hours:graveyard-hill}",
+      "type": "hours",
+      "name": "graveyard-hill"
+    },
+    {
+      "token": "${cdref:queue:dispatch-overflow}",
+      "type": "queue",
+      "name": "dispatch-overflow"
+    },
+    {
+      "token": "${cdref:queue:graveyard-hill-crew}",
+      "type": "queue",
+      "name": "graveyard-hill-crew"
+    },
+    {
+      "token": "${cdref:queue:old-town-crew}",
+      "type": "queue",
+      "name": "old-town-crew"
+    }
+  ],
+  "meta": {
+    "generator": "hollow-hour generators/districts.ts",
+    "sourceHash": "sha256:da2b5658c620ada414109ac529b32e97fadd5fe17993273cea9b5520d6a4de7c",
+    "sourceKind": "ts"
+  }
+}

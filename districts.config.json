@@ -1,0 +1,20 @@
+{
+  "$comment": "The districts the hotline dispatches to. The generator writes hh-district-<slug> and hh-queue-experience-<slug> for each entry; overflowTo names the sibling crew a full queue spills to, and must be another slug here. Adding a district is one entry plus npm run generate.",
+  "districts": [
+    {
+      "slug": "old-town",
+      "name": "Old Town",
+      "overflowTo": "harborside"
+    },
+    {
+      "slug": "harborside",
+      "name": "Harborside",
+      "overflowTo": "graveyard-hill"
+    },
+    {
+      "slug": "graveyard-hill",
+      "name": "Graveyard Hill",
+      "overflowTo": "old-town"
+    }
+  ]
+}

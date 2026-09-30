@@ -1,0 +1,436 @@
+{
+  "flowdoc": "0.2",
+  "kind": "flow",
+  "name": "hh-district-menu",
+  "description": "The keypad district menu, one key per district. Generated from districts.config.json by generators/districts.ts; edit the config, not this flow.",
+  "connectType": "CONTACT_FLOW",
+  "content": {
+    "Version": "2019-10-30",
+    "StartAction": "ask-district",
+    "Actions": [
+      {
+        "Identifier": "ask-district",
+        "Type": "GetParticipantInput",
+        "Parameters": {
+          "InputTimeLimitSeconds": "8",
+          "StoreInput": "False",
+          "Text": "Where are you calling from? For Old Town, press 1. For Harborside, press 2. For Graveyard Hill, press 3."
+        },
+        "Transitions": {
+          "NextAction": "hand-to-dispatch",
+          "Errors": [
+            {
+              "ErrorType": "InputTimeLimitExceeded",
+              "NextAction": "hand-to-dispatch"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "hand-to-dispatch"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hand-to-dispatch"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "route-old-town",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "NextAction": "route-harborside",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "2"
+                ]
+              }
+            },
+            {
+              "NextAction": "route-graveyard-hill",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "3"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "route-old-town",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "district": "old-town",
+            "districtName": "Old Town"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "to-old-town",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hand-to-dispatch"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "to-old-town",
+        "Type": "TransferToFlow",
+        "Parameters": {
+          "ContactFlowId": "${cdref:flow:hh-district-old-town}"
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hand-to-dispatch"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "route-harborside",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "district": "harborside",
+            "districtName": "Harborside"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "to-harborside",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hand-to-dispatch"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "to-harborside",
+        "Type": "TransferToFlow",
+        "Parameters": {
+          "ContactFlowId": "${cdref:flow:hh-district-harborside}"
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hand-to-dispatch"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "route-graveyard-hill",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "district": "graveyard-hill",
+            "districtName": "Graveyard Hill"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "to-graveyard-hill",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hand-to-dispatch"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "to-graveyard-hill",
+        "Type": "TransferToFlow",
+        "Parameters": {
+          "ContactFlowId": "${cdref:flow:hh-district-graveyard-hill}"
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hand-to-dispatch"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "hand-to-dispatch",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Let me put you through to a dispatcher."
+        },
+        "Transitions": {
+          "NextAction": "note-dispatch",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "note-dispatch"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "note-dispatch",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "districtName": "Dispatch"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "set-dispatch-customer-whisper",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-customer-whisper"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-customer-whisper",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "CustomerWhisper": "${cdref:flow:hh-customer-whisper}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-dispatch-agent-whisper",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-agent-whisper"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-agent-whisper",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "AgentWhisper": "${cdref:flow:hh-agent-whisper}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-dispatch-queue",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-queue"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-queue",
+        "Type": "UpdateContactTargetQueue",
+        "Parameters": {
+          "QueueId": "${cdref:queue:dispatch-overflow}"
+        },
+        "Transitions": {
+          "NextAction": "transfer-to-dispatch",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "transfer-to-dispatch",
+        "Type": "TransferContactToQueue",
+        "Parameters": {},
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "QueueAtCapacity",
+              "NextAction": "lines-busy"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "lines-busy",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Every crew is out on a call. Please call back in a few minutes."
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hang-up"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "apologize",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Something went wrong on our side. Please call back in a few minutes."
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hang-up"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "hang-up",
+        "Type": "DisconnectParticipant",
+        "Parameters": {},
+        "Transitions": {}
+      }
+    ]
+  },
+  "layout": {
+    "apologize": {
+      "x": 2360,
+      "y": 120
+    },
+    "ask-district": {
+      "x": 20,
+      "y": 20
+    },
+    "hand-to-dispatch": {
+      "x": 800,
+      "y": 20
+    },
+    "hang-up": {
+      "x": 2620,
+      "y": 20
+    },
+    "lines-busy": {
+      "x": 2360,
+      "y": 20
+    },
+    "note-dispatch": {
+      "x": 1060,
+      "y": 20
+    },
+    "route-graveyard-hill": {
+      "x": 280,
+      "y": 220
+    },
+    "route-harborside": {
+      "x": 280,
+      "y": 120
+    },
+    "route-old-town": {
+      "x": 280,
+      "y": 20
+    },
+    "set-dispatch-agent-whisper": {
+      "x": 1580,
+      "y": 20
+    },
+    "set-dispatch-customer-whisper": {
+      "x": 1320,
+      "y": 20
+    },
+    "set-dispatch-queue": {
+      "x": 1840,
+      "y": 20
+    },
+    "to-graveyard-hill": {
+      "x": 540,
+      "y": 220
+    },
+    "to-harborside": {
+      "x": 540,
+      "y": 120
+    },
+    "to-old-town": {
+      "x": 540,
+      "y": 20
+    },
+    "transfer-to-dispatch": {
+      "x": 2100,
+      "y": 20
+    }
+  },
+  "refs": [
+    {
+      "token": "${cdref:flow:hh-agent-whisper}",
+      "type": "flow",
+      "name": "hh-agent-whisper"
+    },
+    {
+      "token": "${cdref:flow:hh-customer-whisper}",
+      "type": "flow",
+      "name": "hh-customer-whisper"
+    },
+    {
+      "token": "${cdref:flow:hh-district-graveyard-hill}",
+      "type": "flow",
+      "name": "hh-district-graveyard-hill"
+    },
+    {
+      "token": "${cdref:flow:hh-district-harborside}",
+      "type": "flow",
+      "name": "hh-district-harborside"
+    },
+    {
+      "token": "${cdref:flow:hh-district-old-town}",
+      "type": "flow",
+      "name": "hh-district-old-town"
+    },
+    {
+      "token": "${cdref:queue:dispatch-overflow}",
+      "type": "queue",
+      "name": "dispatch-overflow"
+    }
+  ],
+  "meta": {
+    "generator": "hollow-hour generators/districts.ts",
+    "sourceHash": "sha256:7d227123165320e6ac553356f936ddf20a0c2099b06d5d2c3d69d7ff84607b16",
+    "sourceKind": "ts"
+  }
+}

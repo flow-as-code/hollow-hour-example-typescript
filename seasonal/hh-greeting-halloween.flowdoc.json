@@ -1,0 +1,81 @@
+{
+  "flowdoc": "0.2",
+  "kind": "module",
+  "name": "hh-greeting-halloween",
+  "description": "The October greeting. Released through its live alias in envs/seasonal-<environment>.",
+  "connectType": "MODULE",
+  "content": {
+    "Version": "2019-10-30",
+    "StartAction": "greet",
+    "Settings": {
+      "InputParameters": [],
+      "OutputParameters": [],
+      "Transitions": []
+    },
+    "Actions": [
+      {
+        "Identifier": "greet",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Happy Halloween from Hollow Hour Removal Co. October is our busiest month, so every crew is on shift tonight. If anyone is hurt or in danger, hang up and call your local emergency number (911 in the US). This call is recorded so our crews can learn from it."
+        },
+        "Transitions": {
+          "NextAction": "set-season",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-season"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-season",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "season": "halloween-2026"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "done",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "done"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "done",
+        "Type": "EndFlowModuleExecution",
+        "Parameters": {},
+        "Transitions": {}
+      }
+    ]
+  },
+  "layout": {
+    "done": {
+      "x": 540,
+      "y": 20
+    },
+    "greet": {
+      "x": 20,
+      "y": 20
+    },
+    "set-season": {
+      "x": 280,
+      "y": 20
+    }
+  },
+  "refs": [],
+  "meta": {
+    "generator": "cli@0.2.0",
+    "sourceHash": "sha256:823e0addb4c4132c647765a8257e7e149757e7d1821f7ede51c8c5ade46886d7",
+    "sourceKind": "ts"
+  }
+}

@@ -1,0 +1,436 @@
+{
+  "flowdoc": "0.2",
+  "kind": "flow",
+  "name": "hh-queue-experience-graveyard-hill",
+  "description": "Queue for the Graveyard Hill crew, offering a move to Old Town when that crew is free. Generated from districts.config.json by generators/districts.ts; edit the config, not this flow.",
+  "connectType": "CUSTOMER_QUEUE",
+  "content": {
+    "Version": "2019-10-30",
+    "StartAction": "check-moved",
+    "Actions": [
+      {
+        "Identifier": "check-moved",
+        "Type": "Compare",
+        "Parameters": {
+          "ComparisonValue": "$.Attributes.moved"
+        },
+        "Transitions": {
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "poll-crews"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "settle-in",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "true"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "poll-crews",
+        "Type": "Loop",
+        "Parameters": {
+          "LoopCount": "3"
+        },
+        "Transitions": {
+          "NextAction": "settle-in",
+          "Errors": [],
+          "Conditions": [
+            {
+              "NextAction": "check-eta",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "ContinueLooping"
+                ]
+              }
+            },
+            {
+              "NextAction": "settle-in",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "DoneLooping"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "check-eta",
+        "Type": "InvokeLambdaFunction",
+        "Parameters": {
+          "InvocationTimeLimitSeconds": 3,
+          "InvocationType": "SYNCHRONOUS",
+          "LambdaFunctionARN": "${cdref:lambda:crew-eta}",
+          "LambdaInvocationAttributes": {
+            "district": "graveyard-hill"
+          },
+          "ResponseValidation": {
+            "ResponseType": "JSON"
+          }
+        },
+        "Transitions": {
+          "NextAction": "share-eta",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "check-sibling"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "share-eta",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "The Graveyard Hill crew expects to be free in about $.External.etaMinutes minutes."
+        },
+        "Transitions": {
+          "NextAction": "check-sibling",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "check-sibling"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "check-sibling",
+        "Type": "CheckMetricData",
+        "Parameters": {
+          "MetricType": "NumberOfAgentsAvailable",
+          "QueueId": "${cdref:queue:old-town-crew}"
+        },
+        "Transitions": {
+          "NextAction": "hold",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hold"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "hold"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "offer-move",
+              "Condition": {
+                "Operator": "NumberGreaterThan",
+                "Operands": [
+                  "0"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "offer-move",
+        "Type": "GetParticipantInput",
+        "Parameters": {
+          "InputTimeLimitSeconds": "6",
+          "StoreInput": "False",
+          "Text": "The Old Town crew has someone free right now. To move to them, press 1. To keep your place here, press 2."
+        },
+        "Transitions": {
+          "NextAction": "hold",
+          "Errors": [
+            {
+              "ErrorType": "InputTimeLimitExceeded",
+              "NextAction": "hold"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "hold"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hold"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "note-move",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "NextAction": "hold",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "2"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "note-move",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "district": "old-town",
+            "districtName": "Old Town",
+            "moved": "true"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "moving",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hold"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "moving",
+        "Type": "MessageParticipantIteratively",
+        "Parameters": {
+          "InterruptFrequencySeconds": "5",
+          "Messages": [
+            {
+              "Text": "Moving you to the Old Town crew now."
+            }
+          ]
+        },
+        "Transitions": {
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "stay-here"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "move-to-sibling",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "MessagesInterrupted"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "move-to-sibling",
+        "Type": "DequeueContactAndTransferToQueue",
+        "Parameters": {
+          "QueueId": "${cdref:queue:old-town-crew}"
+        },
+        "Transitions": {
+          "NextAction": "done",
+          "Errors": [
+            {
+              "ErrorType": "QueueAtCapacity",
+              "NextAction": "sibling-full"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "stay-here"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "sibling-full",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "The Old Town crew just filled up. You still have your place with Graveyard Hill."
+        },
+        "Transitions": {
+          "NextAction": "stay-here",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "stay-here"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "stay-here",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "district": "graveyard-hill",
+            "districtName": "Graveyard Hill",
+            "moved": "false"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "hold",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hold"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "hold",
+        "Type": "MessageParticipantIteratively",
+        "Parameters": {
+          "InterruptFrequencySeconds": "30",
+          "Messages": [
+            {
+              "Text": "While you wait: keep the lights on, keep pets close, and stay in a room with a door you can open."
+            },
+            {
+              "Text": "A line of salt across the doorway never hurts. Nor does a cup of tea."
+            }
+          ]
+        },
+        "Transitions": {
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "done"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "poll-crews",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "MessagesInterrupted"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "settle-in",
+        "Type": "MessageParticipantIteratively",
+        "Parameters": {
+          "Messages": [
+            {
+              "Text": "You are still in line for the $.Attributes.districtName crew, and they know you are waiting."
+            },
+            {
+              "Text": "Keep the lights on and stay with others. A crew member will be with you soon."
+            }
+          ]
+        },
+        "Transitions": {
+          "Errors": [],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "done",
+        "Type": "EndFlowExecution",
+        "Parameters": {},
+        "Transitions": {}
+      }
+    ]
+  },
+  "layout": {
+    "check-eta": {
+      "x": 540,
+      "y": 120
+    },
+    "check-moved": {
+      "x": 20,
+      "y": 20
+    },
+    "check-sibling": {
+      "x": 1060,
+      "y": 20
+    },
+    "done": {
+      "x": 3140,
+      "y": 20
+    },
+    "hold": {
+      "x": 2880,
+      "y": 20
+    },
+    "move-to-sibling": {
+      "x": 2100,
+      "y": 20
+    },
+    "moving": {
+      "x": 1840,
+      "y": 20
+    },
+    "note-move": {
+      "x": 1580,
+      "y": 20
+    },
+    "offer-move": {
+      "x": 1320,
+      "y": 20
+    },
+    "poll-crews": {
+      "x": 280,
+      "y": 20
+    },
+    "settle-in": {
+      "x": 540,
+      "y": 20
+    },
+    "share-eta": {
+      "x": 800,
+      "y": 20
+    },
+    "sibling-full": {
+      "x": 2360,
+      "y": 20
+    },
+    "stay-here": {
+      "x": 2620,
+      "y": 20
+    }
+  },
+  "refs": [
+    {
+      "token": "${cdref:lambda:crew-eta}",
+      "type": "lambda",
+      "name": "crew-eta"
+    },
+    {
+      "token": "${cdref:queue:old-town-crew}",
+      "type": "queue",
+      "name": "old-town-crew"
+    }
+  ],
+  "meta": {
+    "generator": "hollow-hour generators/districts.ts",
+    "sourceHash": "sha256:0414d57f6a41287556574cddf87bc67afe521c3074aa3564521e14609f5150d5",
+    "sourceKind": "ts"
+  }
+}

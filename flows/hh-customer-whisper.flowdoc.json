@@ -1,0 +1,52 @@
+{
+  "flowdoc": "0.2",
+  "kind": "flow",
+  "name": "hh-customer-whisper",
+  "description": "What the caller hears as a district crew picks up. Reads contact attributes only.",
+  "connectType": "CUSTOMER_WHISPER",
+  "content": {
+    "Version": "2019-10-30",
+    "StartAction": "connecting",
+    "Actions": [
+      {
+        "Identifier": "connecting",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "You are through to the $.Attributes.districtName crew. Stay with others and keep the lights on."
+        },
+        "Transitions": {
+          "NextAction": "done",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "done"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "done",
+        "Type": "EndFlowExecution",
+        "Parameters": {},
+        "Transitions": {}
+      }
+    ]
+  },
+  "layout": {
+    "connecting": {
+      "x": 20,
+      "y": 20
+    },
+    "done": {
+      "x": 280,
+      "y": 20
+    }
+  },
+  "refs": [],
+  "meta": {
+    "generator": "cli@0.2.0",
+    "sourceHash": "sha256:cb7a3ad9edfcb6cfef8c9f619f83dd2de852f9c501522315b97cbd1dd8b14240",
+    "sourceKind": "ts"
+  }
+}

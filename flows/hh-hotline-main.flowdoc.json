@@ -1,0 +1,1500 @@
+{
+  "flowdoc": "0.2",
+  "kind": "flow",
+  "name": "hh-hotline-main",
+  "description": "Hollow Hour Removal Co. front door: greeting, safety question, keypad interview, grade, district.",
+  "connectType": "CONTACT_FLOW",
+  "content": {
+    "Version": "2019-10-30",
+    "StartAction": "enable-logging",
+    "Actions": [
+      {
+        "Identifier": "enable-logging",
+        "Type": "UpdateFlowLoggingBehavior",
+        "Parameters": {
+          "FlowLoggingBehavior": "Enabled"
+        },
+        "Transitions": {
+          "NextAction": "set-voice",
+          "Errors": [],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-voice",
+        "Type": "UpdateContactTextToSpeechVoice",
+        "Parameters": {
+          "TextToSpeechEngine": "Neural",
+          "TextToSpeechVoice": "Matthew"
+        },
+        "Transitions": {
+          "NextAction": "recording-notice",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "recording-notice"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "recording-notice",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Hollow Hour Removal. Calls are recorded."
+        },
+        "Transitions": {
+          "NextAction": "start-recording",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "play-greeting"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "start-recording",
+        "Type": "UpdateContactRecordingAndAnalyticsBehavior",
+        "Parameters": {
+          "VoiceBehavior": {
+            "VoiceRecordingBehavior": {
+              "RecordedParticipants": [
+                "Agent",
+                "Customer"
+              ]
+            }
+          }
+        },
+        "Transitions": {
+          "NextAction": "play-greeting",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "play-greeting"
+            },
+            {
+              "ErrorType": "ChannelMismatch",
+              "NextAction": "play-greeting"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "play-greeting",
+        "Type": "InvokeFlowModule",
+        "Parameters": {
+          "FlowModuleId": "${cdref:module:greeting@live}"
+        },
+        "Transitions": {
+          "NextAction": "tag-season",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "fallback-greeting"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "tag-season",
+        "Type": "TagContact",
+        "Parameters": {
+          "Tags": {
+            "season": "$.Attributes.season"
+          }
+        },
+        "Transitions": {
+          "NextAction": "look-up-caller",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "look-up-caller"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "look-up-caller",
+        "Type": "InvokeLambdaFunction",
+        "Parameters": {
+          "InvocationTimeLimitSeconds": 4,
+          "InvocationType": "SYNCHRONOUS",
+          "LambdaFunctionARN": "${cdref:lambda:caller-lookup}",
+          "ResponseValidation": {
+            "ResponseType": "JSON"
+          }
+        },
+        "Transitions": {
+          "NextAction": "check-caller",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-anyone-hurt"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "check-caller",
+        "Type": "Compare",
+        "Parameters": {
+          "ComparisonValue": "$.External.status"
+        },
+        "Transitions": {
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "ask-anyone-hurt"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "remember-caller",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "known"
+                ]
+              }
+            },
+            {
+              "NextAction": "remember-caller",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "account"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "remember-caller",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "callerName": "$.External.callerName",
+            "callerStatus": "$.External.status"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "welcome-back",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-anyone-hurt"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "welcome-back",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Welcome back, $.Attributes.callerName."
+        },
+        "Transitions": {
+          "NextAction": "ask-anyone-hurt",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-anyone-hurt"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "ask-anyone-hurt",
+        "Type": "GetParticipantInput",
+        "Parameters": {
+          "InputTimeLimitSeconds": "8",
+          "StoreInput": "False",
+          "Text": "Before anything else: is anyone hurt? If someone is hurt, press 1. If everyone is all right, press 2."
+        },
+        "Transitions": {
+          "NextAction": "emergency-advice",
+          "Errors": [
+            {
+              "ErrorType": "InputTimeLimitExceeded",
+              "NextAction": "emergency-advice"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "emergency-advice"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "emergency-advice"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "emergency-advice",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "NextAction": "start-interview",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "2"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "emergency-advice",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "If anyone is hurt or in danger, please hang up now and call your local emergency number (911 in the US). We are a removal crew, not an emergency service."
+        },
+        "Transitions": {
+          "NextAction": "offer-end-or-continue",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "offer-end-or-continue"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "offer-end-or-continue",
+        "Type": "GetParticipantInput",
+        "Parameters": {
+          "InputTimeLimitSeconds": "8",
+          "StoreInput": "False",
+          "Text": "To end this call now, press 1. To stay on the line with us, press 2."
+        },
+        "Transitions": {
+          "NextAction": "say-goodbye",
+          "Errors": [
+            {
+              "ErrorType": "InputTimeLimitExceeded",
+              "NextAction": "say-goodbye"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "say-goodbye"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "say-goodbye"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "say-goodbye",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "NextAction": "note-injury",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "2"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "note-injury",
+        "Type": "UpdateFlowAttributes",
+        "Parameters": {
+          "FlowAttributes": {
+            "canSee": {
+              "Value": "no"
+            },
+            "coldSpot": {
+              "Value": "no"
+            },
+            "injured": {
+              "Value": "yes"
+            },
+            "movesObjects": {
+              "Value": "no"
+            },
+            "multiple": {
+              "Value": "no"
+            },
+            "sounds": {
+              "Value": "no"
+            },
+            "touched": {
+              "Value": "no"
+            }
+          }
+        },
+        "Transitions": {
+          "NextAction": "ask-can-see",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-can-see"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "start-interview",
+        "Type": "UpdateFlowAttributes",
+        "Parameters": {
+          "FlowAttributes": {
+            "canSee": {
+              "Value": "no"
+            },
+            "coldSpot": {
+              "Value": "no"
+            },
+            "injured": {
+              "Value": "no"
+            },
+            "movesObjects": {
+              "Value": "no"
+            },
+            "multiple": {
+              "Value": "no"
+            },
+            "sounds": {
+              "Value": "no"
+            },
+            "touched": {
+              "Value": "no"
+            }
+          }
+        },
+        "Transitions": {
+          "NextAction": "ask-can-see",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-can-see"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "ask-can-see",
+        "Type": "GetParticipantInput",
+        "Parameters": {
+          "InputTimeLimitSeconds": "8",
+          "StoreInput": "False",
+          "Text": "Six quick questions, then we will send the right crew. Can you see it right now? Press 1 for yes, 2 for no."
+        },
+        "Transitions": {
+          "NextAction": "ask-moves-objects",
+          "Errors": [
+            {
+              "ErrorType": "InputTimeLimitExceeded",
+              "NextAction": "ask-moves-objects"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "ask-moves-objects"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-moves-objects"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "note-can-see",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "NextAction": "ask-moves-objects",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "2"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "note-can-see",
+        "Type": "UpdateFlowAttributes",
+        "Parameters": {
+          "FlowAttributes": {
+            "canSee": {
+              "Value": "yes"
+            }
+          }
+        },
+        "Transitions": {
+          "NextAction": "ask-moves-objects",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-moves-objects"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "ask-moves-objects",
+        "Type": "GetParticipantInput",
+        "Parameters": {
+          "InputTimeLimitSeconds": "8",
+          "StoreInput": "False",
+          "Text": "Has it moved anything? Press 1 for yes, 2 for no."
+        },
+        "Transitions": {
+          "NextAction": "ask-cold-spot",
+          "Errors": [
+            {
+              "ErrorType": "InputTimeLimitExceeded",
+              "NextAction": "ask-cold-spot"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "ask-cold-spot"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-cold-spot"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "note-moves-objects",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "NextAction": "ask-cold-spot",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "2"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "note-moves-objects",
+        "Type": "UpdateFlowAttributes",
+        "Parameters": {
+          "FlowAttributes": {
+            "movesObjects": {
+              "Value": "yes"
+            }
+          }
+        },
+        "Transitions": {
+          "NextAction": "ask-cold-spot",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-cold-spot"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "ask-cold-spot",
+        "Type": "GetParticipantInput",
+        "Parameters": {
+          "InputTimeLimitSeconds": "8",
+          "StoreInput": "False",
+          "Text": "Is there a cold spot where it happens? Press 1 for yes, 2 for no."
+        },
+        "Transitions": {
+          "NextAction": "ask-sounds",
+          "Errors": [
+            {
+              "ErrorType": "InputTimeLimitExceeded",
+              "NextAction": "ask-sounds"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "ask-sounds"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-sounds"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "note-cold-spot",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "NextAction": "ask-sounds",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "2"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "note-cold-spot",
+        "Type": "UpdateFlowAttributes",
+        "Parameters": {
+          "FlowAttributes": {
+            "coldSpot": {
+              "Value": "yes"
+            }
+          }
+        },
+        "Transitions": {
+          "NextAction": "ask-sounds",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-sounds"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "ask-sounds",
+        "Type": "GetParticipantInput",
+        "Parameters": {
+          "InputTimeLimitSeconds": "8",
+          "StoreInput": "False",
+          "Text": "Have you heard it? Knocking, footsteps, humming, anything at all. Press 1 for yes, 2 for no."
+        },
+        "Transitions": {
+          "NextAction": "ask-touched",
+          "Errors": [
+            {
+              "ErrorType": "InputTimeLimitExceeded",
+              "NextAction": "ask-touched"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "ask-touched"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-touched"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "note-sounds",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "NextAction": "ask-touched",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "2"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "note-sounds",
+        "Type": "UpdateFlowAttributes",
+        "Parameters": {
+          "FlowAttributes": {
+            "sounds": {
+              "Value": "yes"
+            }
+          }
+        },
+        "Transitions": {
+          "NextAction": "ask-touched",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-touched"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "ask-touched",
+        "Type": "GetParticipantInput",
+        "Parameters": {
+          "InputTimeLimitSeconds": "8",
+          "StoreInput": "False",
+          "Text": "Has it touched anyone? Press 1 for yes, 2 for no."
+        },
+        "Transitions": {
+          "NextAction": "ask-multiple",
+          "Errors": [
+            {
+              "ErrorType": "InputTimeLimitExceeded",
+              "NextAction": "ask-multiple"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "ask-multiple"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-multiple"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "note-touched",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "NextAction": "ask-multiple",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "2"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "note-touched",
+        "Type": "UpdateFlowAttributes",
+        "Parameters": {
+          "FlowAttributes": {
+            "touched": {
+              "Value": "yes"
+            }
+          }
+        },
+        "Transitions": {
+          "NextAction": "ask-multiple",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "ask-multiple"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "ask-multiple",
+        "Type": "GetParticipantInput",
+        "Parameters": {
+          "InputTimeLimitSeconds": "8",
+          "StoreInput": "False",
+          "Text": "Last one. Could there be more than one of them? Press 1 for yes, 2 for no."
+        },
+        "Transitions": {
+          "NextAction": "classify",
+          "Errors": [
+            {
+              "ErrorType": "InputTimeLimitExceeded",
+              "NextAction": "classify"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "classify"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "classify"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "note-multiple",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "NextAction": "classify",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "2"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "note-multiple",
+        "Type": "UpdateFlowAttributes",
+        "Parameters": {
+          "FlowAttributes": {
+            "multiple": {
+              "Value": "yes"
+            }
+          }
+        },
+        "Transitions": {
+          "NextAction": "classify",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "classify"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "classify",
+        "Type": "InvokeLambdaFunction",
+        "Parameters": {
+          "InvocationTimeLimitSeconds": 4,
+          "InvocationType": "SYNCHRONOUS",
+          "LambdaFunctionARN": "${cdref:lambda:classify-apparition}",
+          "LambdaInvocationAttributes": {
+            "canSee": "$.FlowAttributes.canSee",
+            "coldSpot": "$.FlowAttributes.coldSpot",
+            "injured": "$.FlowAttributes.injured",
+            "movesObjects": "$.FlowAttributes.movesObjects",
+            "multiple": "$.FlowAttributes.multiple",
+            "sounds": "$.FlowAttributes.sounds",
+            "touched": "$.FlowAttributes.touched"
+          },
+          "ResponseValidation": {
+            "ResponseType": "JSON"
+          }
+        },
+        "Transitions": {
+          "NextAction": "record-grade",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hand-to-dispatch"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "record-grade",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "advice": "$.External.advice",
+            "grade": "$.External.grade",
+            "gradeName": "$.External.gradeName"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "share-advice",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hand-to-dispatch"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "share-advice",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Thank you. From what you describe, this is a $.Attributes.gradeName case. $.Attributes.advice"
+        },
+        "Transitions": {
+          "NextAction": "check-grade",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "check-grade"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "check-grade",
+        "Type": "Compare",
+        "Parameters": {
+          "ComparisonValue": "$.Attributes.grade"
+        },
+        "Transitions": {
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "hand-to-dispatch"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "to-district-menu",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "NextAction": "to-district-menu",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "2"
+                ]
+              }
+            },
+            {
+              "NextAction": "to-district-menu",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "3"
+                ]
+              }
+            },
+            {
+              "NextAction": "send-to-lantern-crew",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "4"
+                ]
+              }
+            },
+            {
+              "NextAction": "send-to-lantern-crew",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "5"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "to-district-menu",
+        "Type": "TransferToFlow",
+        "Parameters": {
+          "ContactFlowId": "${cdref:flow:hh-district-menu}"
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hand-to-dispatch"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "send-to-lantern-crew",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "This one is for the Lantern Crew. Stay somewhere bright and stay together while I connect you."
+        },
+        "Transitions": {
+          "NextAction": "note-lantern",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "note-lantern"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "note-lantern",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "district": "lantern-crew",
+            "districtName": "Lantern"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "set-lantern-customer-whisper",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-lantern-customer-whisper"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-lantern-customer-whisper",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "CustomerWhisper": "${cdref:flow:hh-customer-whisper}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-lantern-agent-whisper",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-lantern-agent-whisper"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-lantern-agent-whisper",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "AgentWhisper": "${cdref:flow:hh-agent-whisper}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-lantern-queue",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-lantern-queue"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-lantern-queue",
+        "Type": "UpdateContactTargetQueue",
+        "Parameters": {
+          "QueueId": "${cdref:queue:lantern-crew}"
+        },
+        "Transitions": {
+          "NextAction": "transfer-to-lantern",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hand-to-dispatch"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "transfer-to-lantern",
+        "Type": "TransferContactToQueue",
+        "Parameters": {},
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "QueueAtCapacity",
+              "NextAction": "hand-to-dispatch"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "hand-to-dispatch",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Let me put you through to a dispatcher."
+        },
+        "Transitions": {
+          "NextAction": "note-dispatch",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "note-dispatch"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "note-dispatch",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "districtName": "Dispatch"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "set-dispatch-customer-whisper",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-customer-whisper"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-customer-whisper",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "CustomerWhisper": "${cdref:flow:hh-customer-whisper}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-dispatch-agent-whisper",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-agent-whisper"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-agent-whisper",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "AgentWhisper": "${cdref:flow:hh-agent-whisper}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-dispatch-queue",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-queue"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-queue",
+        "Type": "UpdateContactTargetQueue",
+        "Parameters": {
+          "QueueId": "${cdref:queue:dispatch-overflow}"
+        },
+        "Transitions": {
+          "NextAction": "transfer-to-dispatch",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "transfer-to-dispatch",
+        "Type": "TransferContactToQueue",
+        "Parameters": {},
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "QueueAtCapacity",
+              "NextAction": "lines-busy"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "fallback-greeting",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Hollow Hour Removal. If anyone is hurt or in danger, hang up and call your local emergency number (911 in the US)."
+        },
+        "Transitions": {
+          "NextAction": "look-up-caller",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "look-up-caller"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "say-goodbye",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Take care of each other. Call us back once everyone is safe."
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hang-up"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "lines-busy",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Every crew is out on a call. Please call back in a few minutes."
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hang-up"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "apologize",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Something went wrong on our side. Please call back in a few minutes."
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hang-up"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "hang-up",
+        "Type": "DisconnectParticipant",
+        "Parameters": {},
+        "Transitions": {}
+      }
+    ]
+  },
+  "layout": {
+    "apologize": {
+      "x": 10940,
+      "y": 120
+    },
+    "ask-anyone-hurt": {
+      "x": 2620,
+      "y": 20
+    },
+    "ask-can-see": {
+      "x": 3660,
+      "y": 20
+    },
+    "ask-cold-spot": {
+      "x": 4700,
+      "y": 20
+    },
+    "ask-moves-objects": {
+      "x": 4180,
+      "y": 20
+    },
+    "ask-multiple": {
+      "x": 6260,
+      "y": 20
+    },
+    "ask-sounds": {
+      "x": 5220,
+      "y": 20
+    },
+    "ask-touched": {
+      "x": 5740,
+      "y": 20
+    },
+    "check-caller": {
+      "x": 1840,
+      "y": 20
+    },
+    "check-grade": {
+      "x": 7560,
+      "y": 20
+    },
+    "classify": {
+      "x": 6780,
+      "y": 20
+    },
+    "emergency-advice": {
+      "x": 2880,
+      "y": 20
+    },
+    "enable-logging": {
+      "x": 20,
+      "y": 20
+    },
+    "fallback-greeting": {
+      "x": 1320,
+      "y": 120
+    },
+    "hand-to-dispatch": {
+      "x": 9380,
+      "y": 20
+    },
+    "hang-up": {
+      "x": 11200,
+      "y": 20
+    },
+    "lines-busy": {
+      "x": 10940,
+      "y": 20
+    },
+    "look-up-caller": {
+      "x": 1580,
+      "y": 20
+    },
+    "note-can-see": {
+      "x": 3920,
+      "y": 20
+    },
+    "note-cold-spot": {
+      "x": 4960,
+      "y": 20
+    },
+    "note-dispatch": {
+      "x": 9640,
+      "y": 20
+    },
+    "note-injury": {
+      "x": 3400,
+      "y": 120
+    },
+    "note-lantern": {
+      "x": 8080,
+      "y": 20
+    },
+    "note-moves-objects": {
+      "x": 4440,
+      "y": 20
+    },
+    "note-multiple": {
+      "x": 6520,
+      "y": 20
+    },
+    "note-sounds": {
+      "x": 5480,
+      "y": 20
+    },
+    "note-touched": {
+      "x": 6000,
+      "y": 20
+    },
+    "offer-end-or-continue": {
+      "x": 3140,
+      "y": 20
+    },
+    "play-greeting": {
+      "x": 1060,
+      "y": 20
+    },
+    "record-grade": {
+      "x": 7040,
+      "y": 20
+    },
+    "recording-notice": {
+      "x": 540,
+      "y": 20
+    },
+    "remember-caller": {
+      "x": 2100,
+      "y": 20
+    },
+    "say-goodbye": {
+      "x": 3400,
+      "y": 20
+    },
+    "send-to-lantern-crew": {
+      "x": 7820,
+      "y": 120
+    },
+    "set-dispatch-agent-whisper": {
+      "x": 10160,
+      "y": 20
+    },
+    "set-dispatch-customer-whisper": {
+      "x": 9900,
+      "y": 20
+    },
+    "set-dispatch-queue": {
+      "x": 10420,
+      "y": 20
+    },
+    "set-lantern-agent-whisper": {
+      "x": 8600,
+      "y": 20
+    },
+    "set-lantern-customer-whisper": {
+      "x": 8340,
+      "y": 20
+    },
+    "set-lantern-queue": {
+      "x": 8860,
+      "y": 20
+    },
+    "set-voice": {
+      "x": 280,
+      "y": 20
+    },
+    "share-advice": {
+      "x": 7300,
+      "y": 20
+    },
+    "start-interview": {
+      "x": 2880,
+      "y": 120
+    },
+    "start-recording": {
+      "x": 800,
+      "y": 20
+    },
+    "tag-season": {
+      "x": 1320,
+      "y": 20
+    },
+    "to-district-menu": {
+      "x": 7820,
+      "y": 20
+    },
+    "transfer-to-dispatch": {
+      "x": 10680,
+      "y": 20
+    },
+    "transfer-to-lantern": {
+      "x": 9120,
+      "y": 20
+    },
+    "welcome-back": {
+      "x": 2360,
+      "y": 20
+    }
+  },
+  "refs": [
+    {
+      "token": "${cdref:flow:hh-agent-whisper}",
+      "type": "flow",
+      "name": "hh-agent-whisper"
+    },
+    {
+      "token": "${cdref:flow:hh-customer-whisper}",
+      "type": "flow",
+      "name": "hh-customer-whisper"
+    },
+    {
+      "token": "${cdref:flow:hh-district-menu}",
+      "type": "flow",
+      "name": "hh-district-menu"
+    },
+    {
+      "token": "${cdref:lambda:caller-lookup}",
+      "type": "lambda",
+      "name": "caller-lookup"
+    },
+    {
+      "token": "${cdref:lambda:classify-apparition}",
+      "type": "lambda",
+      "name": "classify-apparition"
+    },
+    {
+      "token": "${cdref:module:greeting@live}",
+      "type": "module",
+      "name": "greeting",
+      "alias": "live"
+    },
+    {
+      "token": "${cdref:queue:dispatch-overflow}",
+      "type": "queue",
+      "name": "dispatch-overflow"
+    },
+    {
+      "token": "${cdref:queue:lantern-crew}",
+      "type": "queue",
+      "name": "lantern-crew"
+    }
+  ],
+  "meta": {
+    "generator": "cli@0.2.0",
+    "sourceHash": "sha256:192be666902c4b3e476970df7189b5baa25581ac12bac9bfa5c68898acb0100f",
+    "sourceKind": "ts"
+  }
+}
