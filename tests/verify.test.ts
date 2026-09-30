@@ -1,0 +1,73 @@
+/*
+ * Copyright 2026 The flow-as-code Authors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+// VERIFY.md: every row carries its AWS documentation and an honest status.
+
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const text = readFileSync(join(import.meta.dirname, "..", "VERIFY.md"), "utf8");
+const lines = text.split("\n").filter((l) => l.startsWith("| "));
+const [header, , ...rows] = lines;
+const cells = (line: string) =>
+  line
+    .slice(1, -1)
+    .split(" | ")
+    .map((c) => c.trim());
+
+const STATUS = /^(docs-checked 2026-09-30|needs sandbox|sandbox-checked \d{4}-\d{2}-\d{2}, .+)$/;
+
+describe("VERIFY.md", () => {
+  it("has the columns the tasks rely on", () => {
+    expect(cells(header ?? "")).toEqual([
+      "#",
+      "Question",
+      "Answer",
+      "Status",
+      "AWS docs",
+      "Design change forced",
+    ]);
+  });
+
+  it("carries every question the synthesis verified", () => {
+    const ids = rows.map((r) => cells(r)[0]);
+    for (const id of [
+      "16.1",
+      "16.1b",
+      "16.2",
+      "16.3",
+      "16.4",
+      "16.5",
+      "16.6",
+      "16.7",
+      "16.8",
+      "16.9",
+      "16.10",
+      "16.11",
+      "16.12",
+      "5.4",
+      "6.2",
+      "7",
+      "12.7",
+      "15",
+    ]) {
+      expect(ids).toContain(id);
+    }
+  });
+
+  it("gives every row six cells, an AWS doc URL, a status and a design change", () => {
+    const bad = rows
+      .map((row) => ({ row, c: cells(row) }))
+      .filter(
+        ({ c }) =>
+          c.length !== 6 ||
+          !STATUS.test(c[3] ?? "") ||
+          !/https:\/\/docs\.aws\.amazon\.com\/\S+\.html/.test(c[4] ?? "") ||
+          (c[5] ?? "").length === 0,
+      )
+      .map(({ c }) => `${c[0]}: status "${c[3]}"`);
+    expect(bad).toEqual([]);
+  });
+});
