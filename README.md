@@ -1,4 +1,4 @@
-# Hollow Hour Example
+# Hollow Hour Example: TypeScript-first
 
 Hollow Hour Removal Co. runs a dispatch line for haunted households, built on
 Amazon Connect with [flow-as-code](https://flow-as-code.dev/). The business is
@@ -6,6 +6,11 @@ invented. The engineering is not: one set of flows, written once as FlowDocs wit
 typed TypeScript companions, deployed to three environments on three Connect
 instances, where every difference between those environments, the Halloween
 season included, is a reference binding rather than an edit to a flow.
+
+This repository is the TypeScript-first approach: flows are authored as
+FlowDocs and TypeScript, and Terraform is generated from them per
+environment. For the same hotline written entirely in Terraform, see
+[hollow-hour-example-terraform](https://github.com/flow-as-code/hollow-hour-example-terraform).
 
 > Status: **Tier 1 live in dev, qa and prod** (task T1, 2026-09-30). The
 > bootstrap root created the three instances and the state bucket, and each
@@ -174,8 +179,8 @@ You need Node 22.12 or later, and OpenTofu 1.10 or later for
 `npm run validate` and to deploy.
 
 ```sh
-git clone https://github.com/flow-as-code/hollow-hour-example.git
-cd hollow-hour-example
+git clone https://github.com/flow-as-code/hollow-hour-example-typescript.git
+cd hollow-hour-example-typescript
 npm ci
 npm run check       # everything CI's check job runs: lint, types, generated files, flow lint, tests
 npm run validate    # tofu validate of every root, each with its profile's flows emitted into a temporary copy

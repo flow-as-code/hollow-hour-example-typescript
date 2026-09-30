@@ -16,8 +16,11 @@ directory is the record of how anything got the way it is.
 
 These are settled; do not re-ask them.
 
-1. The repository is `flow-as-code/hollow-hour-example` (renamed from
-   `hollow-hour` on 2026-09-30), Apache-2.0, public later.
+1. The repository is `flow-as-code/hollow-hour-example-typescript` (built as
+   `hollow-hour`, renamed `hollow-hour-example`, then renamed again on
+   2026-09-30 when the owner split the showcase into approach-specific
+   repositories; the Terraform-first one is
+   `flow-as-code/hollow-hour-example-terraform`), Apache-2.0, public later.
    flow-as-code integrates it by vendoring a pinned snapshot, under a Phase C
    plan in that repository.
 2. dev, qa and prod are each deployed live, each to its own Connect instance.

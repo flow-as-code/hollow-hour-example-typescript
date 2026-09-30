@@ -220,6 +220,12 @@ Where the build departs from the scope above, and why.
   (`hollow-hour-example=true`) follow it. In-story names keep their form:
   Hollow Hour Removal Co. and the `hh-` prefix. Nothing had been applied, so
   no state moved.
+- **The repository became `hollow-hour-example-typescript`** later on
+  2026-09-30, after all three environments were live. Only repo-facing text
+  followed (package name, clone URL, README). The state key prefix, the tag,
+  the bucket and instance-alias patterns, the Lambda permission statement id
+  and the generator stamp keep `hollow-hour-example`, because changing them
+  would move live state or replace deployed resources.
 - **The Lambda association is `aws_connect_lambda_function_association.connect`**,
   not `.stub`: it associates the real deployed function with the instance,
   and the old address read as a placeholder. It pairs with
