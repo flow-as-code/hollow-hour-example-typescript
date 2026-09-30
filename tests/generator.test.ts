@@ -20,7 +20,7 @@ afterEach(() => {
 
 /** The inputs and outputs of the generator, copied into a scratch checkout. */
 function scratchCopy(): string {
-  const dir = mkdtempSync(join(tmpdir(), "hollow-hour-generate-"));
+  const dir = mkdtempSync(join(tmpdir(), "hollow-hour-example-generate-"));
   temps.push(dir);
   cpSync(join(ROOT, "districts.config.json"), join(dir, "districts.config.json"));
   cpSync(join(ROOT, "refs"), join(dir, "refs"), { recursive: true });

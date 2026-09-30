@@ -26,7 +26,7 @@ depends on, before any flow is written.
    `deploy.yml` is `workflow_dispatch` only, uses GitHub environments dev, qa
    and prod (a reviewer on prod), assumes an OIDC role named by a variable,
    masks the account id, and runs in the concurrency group
-   `hollow-hour-<env>`. Every external `uses:` is pinned to the SHA
+   `hollow-hour-example-<env>`. Every external `uses:` is pinned to the SHA
    flow-as-code pins, with a test that fails on an unpinned one.
 10. Conventions copied from flow-as-code and terraform-provider-flowascode:
     LICENSE, CONTRIBUTING, SECURITY, CODEOWNERS `* @auzroz`, Dependabot for

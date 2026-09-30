@@ -429,7 +429,7 @@
     }
   ],
   "meta": {
-    "generator": "hollow-hour generators/districts.ts",
+    "generator": "hollow-hour-example generators/districts.ts",
     "sourceHash": "sha256:0414d57f6a41287556574cddf87bc67afe521c3074aa3564521e14609f5150d5",
     "sourceKind": "ts"
   }

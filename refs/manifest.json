@@ -86,7 +86,7 @@
       "tier": 1,
       "binding": "address-map",
       "address": {
-        "default": "aws_connect_lambda_function_association.stub[\"caller-lookup\"].function_arn"
+        "default": "aws_connect_lambda_function_association.connect[\"caller-lookup\"].function_arn"
       },
       "usedBy": ["hh-hotline-main"]
     },
@@ -95,7 +95,7 @@
       "tier": 1,
       "binding": "address-map",
       "address": {
-        "default": "aws_connect_lambda_function_association.stub[\"classify-apparition\"].function_arn"
+        "default": "aws_connect_lambda_function_association.connect[\"classify-apparition\"].function_arn"
       },
       "usedBy": ["hh-hotline-main"]
     },
@@ -104,7 +104,7 @@
       "tier": 1,
       "binding": "address-map",
       "address": {
-        "default": "aws_connect_lambda_function_association.stub[\"crew-eta\"].function_arn"
+        "default": "aws_connect_lambda_function_association.connect[\"crew-eta\"].function_arn"
       },
       "usedBy": ["hh-queue-experience-{slug}"]
     },
@@ -113,7 +113,7 @@
       "tier": 2,
       "binding": "address-map",
       "address": {
-        "default": "aws_connect_lambda_function_association.stub[\"plane-check\"].function_arn"
+        "default": "aws_connect_lambda_function_association.connect[\"plane-check\"].function_arn"
       },
       "usedBy": ["hh-hotline-main"]
     },
@@ -122,7 +122,7 @@
       "tier": 2,
       "binding": "address-map",
       "address": {
-        "default": "aws_connect_lambda_function_association.stub[\"prank-score\"].function_arn"
+        "default": "aws_connect_lambda_function_association.connect[\"prank-score\"].function_arn"
       },
       "usedBy": ["hh-hotline-main"]
     },
@@ -131,7 +131,7 @@
       "tier": 2,
       "binding": "address-map",
       "address": {
-        "default": "aws_connect_lambda_function_association.stub[\"district-for-address\"].function_arn"
+        "default": "aws_connect_lambda_function_association.connect[\"district-for-address\"].function_arn"
       },
       "usedBy": ["hh-collect-address"]
     },

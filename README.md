@@ -1,9 +1,9 @@
-# Hollow Hour Removal Co.
+# Hollow Hour Example
 
-A dispatch line for haunted households, built on Amazon Connect with
-[flow-as-code](https://flow-as-code.dev/). The business is invented. The
-engineering is not: one set of flows, written once as FlowDocs with typed
-TypeScript companions, deployed to three environments on three Connect
+Hollow Hour Removal Co. runs a dispatch line for haunted households, built on
+Amazon Connect with [flow-as-code](https://flow-as-code.dev/). The business is
+invented. The engineering is not: one set of flows, written once as FlowDocs with
+typed TypeScript companions, deployed to three environments on three Connect
 instances, where every difference between those environments, the Halloween
 season included, is a reference binding rather than an edit to a flow.
 
@@ -167,8 +167,8 @@ You need Node 22.12 or later, and OpenTofu 1.10 or later for
 `npm run validate` and to deploy.
 
 ```sh
-git clone https://github.com/flow-as-code/hollow-hour.git
-cd hollow-hour
+git clone https://github.com/flow-as-code/hollow-hour-example.git
+cd hollow-hour-example
 npm ci
 npm run check       # everything CI's check job runs: lint, types, generated files, flow lint, tests
 npm run validate    # tofu validate of every root, each with its profile's flows emitted into a temporary copy
@@ -206,19 +206,19 @@ can be planned: the flow root reads the greeting alias ARNs from its state.
 ```sh
 export TF_VAR_aws_region=us-east-1
 export TF_VAR_connect_instance_id=<your instance id>
-export TF_VAR_seasonal_state='{bucket="<state bucket>",key="hollow-hour/dev/seasonal.tfstate",region="us-east-1"}'
+export TF_VAR_seasonal_state='{bucket="<state bucket>",key="hollow-hour-example/dev/seasonal.tfstate",region="us-east-1"}'
 
 npm run emit:dev    # or emit:qa, emit:prod, emit:prod-october
 
 tofu -chdir=envs/seasonal-dev init \
   -backend-config="bucket=<state bucket>" \
-  -backend-config="key=hollow-hour/dev/seasonal.tfstate" \
+  -backend-config="key=hollow-hour-example/dev/seasonal.tfstate" \
   -backend-config="region=us-east-1"
 tofu -chdir=envs/seasonal-dev apply
 
 tofu -chdir=envs/dev init \
   -backend-config="bucket=<state bucket>" \
-  -backend-config="key=hollow-hour/dev/flows.tfstate" \
+  -backend-config="key=hollow-hour-example/dev/flows.tfstate" \
   -backend-config="region=us-east-1"
 tofu -chdir=envs/dev apply
 ```
@@ -233,7 +233,7 @@ In this repository the same steps run from `.github/workflows/deploy.yml`,
 dispatched by hand, one environment at a time, with a reviewer on prod.
 
 Supporting resources are named `hh-<environment>-*` and tagged
-`hollow-hour = true`; flows and modules carry the constant `hh-` prefix.
+`hollow-hour-example = true`; flows and modules carry the constant `hh-` prefix.
 Tear down with `tofu destroy` in `envs/<environment>`, then in
 `envs/seasonal-<environment>`.
 

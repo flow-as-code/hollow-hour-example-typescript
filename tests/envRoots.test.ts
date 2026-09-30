@@ -44,7 +44,7 @@ function forEachKeys(env: string, resource: string): Set<string> | undefined {
     return new Set(loadDistricts().map((d) => d.slug));
   }
   if (
-    resource === "aws_connect_lambda_function_association.stub" ||
+    resource === "aws_connect_lambda_function_association.connect" ||
     resource === "aws_lambda_function.stub"
   ) {
     return stubNames(env);
@@ -156,10 +156,10 @@ describe("every address a map binds exists in its environment", () => {
     expect(resolves("dev", 'aws_connect_queue.shared["lantern-crew"].arn')).toBe(true);
     expect(resolves("dev", "aws_connect_queue.nothing.arn")).toBe(false);
     expect(
-      resolves("dev", 'aws_connect_lambda_function_association.stub["crew-eta"].function_arn'),
+      resolves("dev", 'aws_connect_lambda_function_association.connect["crew-eta"].function_arn'),
     ).toBe(true);
     expect(
-      resolves("dev", 'aws_connect_lambda_function_association.stub["ouija"].function_arn'),
+      resolves("dev", 'aws_connect_lambda_function_association.connect["ouija"].function_arn'),
     ).toBe(false);
     expect(
       resolves("dev", "data.terraform_remote_state.seasonal.outputs.greeting_standard_live_arn"),

@@ -46,7 +46,7 @@ locals {
   name_prefix = "hh-${local.environment}"
 
   tags = {
-    "hollow-hour" = "true"
+    "hollow-hour-example" = "true"
     "environment" = local.environment
   }
 }

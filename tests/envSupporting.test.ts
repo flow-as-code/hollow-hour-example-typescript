@@ -62,7 +62,7 @@ describe("the stub Lambdas in envs/<environment>/lambdas.tf", () => {
         "aws_cloudwatch_log_group.stub",
         "aws_lambda_function.stub",
         "aws_lambda_permission.connect",
-        "aws_connect_lambda_function_association.stub",
+        "aws_connect_lambda_function_association.connect",
       ]) {
         expect(resources(env), r).toContain(r);
       }
@@ -84,10 +84,10 @@ describe("the stub Lambdas in envs/<environment>/lambdas.tf", () => {
       }
     });
 
-    it(`${env}: tags everything the aws provider creates hollow-hour and environment`, () => {
+    it(`${env}: tags everything the aws provider creates hollow-hour-example and environment`, () => {
       const providers = read(env, "providers.tf");
       expect(providers).toMatch(/default_tags \{\s*tags = local\.tags\s*\}/);
-      expect(providers).toContain('"hollow-hour" = "true"');
+      expect(providers).toContain('"hollow-hour-example" = "true"');
       expect(providers).toContain('"environment" = local.environment');
     });
 
@@ -97,7 +97,7 @@ describe("the stub Lambdas in envs/<environment>/lambdas.tf", () => {
       ) as Record<string, string>;
       for (const name of lambdaKeys) {
         expect(map[`lambda:${name}`]).toBe(
-          `aws_connect_lambda_function_association.stub["${name}"].function_arn`,
+          `aws_connect_lambda_function_association.connect["${name}"].function_arn`,
         );
       }
     });

@@ -115,7 +115,7 @@ resource "aws_lambda_function" "stub" {
 resource "aws_lambda_permission" "connect" {
   for_each = local.stubs
 
-  statement_id   = "hollow-hour-connect"
+  statement_id   = "hollow-hour-example-connect"
   action         = "lambda:InvokeFunction"
   function_name  = aws_lambda_function.stub[each.key].function_name
   principal      = "connect.amazonaws.com"
@@ -123,7 +123,7 @@ resource "aws_lambda_permission" "connect" {
   source_arn     = data.aws_connect_instance.this.arn
 }
 
-resource "aws_connect_lambda_function_association" "stub" {
+resource "aws_connect_lambda_function_association" "connect" {
   for_each = local.stubs
 
   instance_id  = var.connect_instance_id

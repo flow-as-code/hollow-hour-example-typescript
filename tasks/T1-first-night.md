@@ -161,3 +161,13 @@ Where the build departs from the scope above, and why.
 - **Queues are capped** (`max_contacts`, 2 in dev and qa, 25 in prod), so
   QueueAtCapacity, the overflow and the lines-busy copy can fire live
   (VERIFY Q2).
+- **The repository is `hollow-hour-example`** (owner decision, 2026-09-30),
+  so the package name, the deploy concurrency group, the state key prefix,
+  the Lambda permission statement id and the resource tag
+  (`hollow-hour-example=true`) follow it. In-story names keep their form:
+  Hollow Hour Removal Co. and the `hh-` prefix. Nothing had been applied, so
+  no state moved.
+- **The Lambda association is `aws_connect_lambda_function_association.connect`**,
+  not `.stub`: it associates the real deployed function with the instance,
+  and the old address read as a placeholder. It pairs with
+  `aws_lambda_permission.connect`; the address maps bind `lambda:<name>` to it.

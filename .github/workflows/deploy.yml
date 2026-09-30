@@ -40,7 +40,7 @@ permissions:
 # One run per environment at a time, never cancelled halfway through an apply,
 # and separate from the provider repository's sandbox-acceptance group.
 concurrency:
-  group: hollow-hour-${{ inputs.environment }}
+  group: hollow-hour-example-${{ inputs.environment }}
   cancel-in-progress: false
 
 jobs:
@@ -104,7 +104,7 @@ jobs:
           dir="envs/seasonal-$ENVIRONMENT"
           tofu -chdir="$dir" init -input=false -lockfile=readonly \
             -backend-config="bucket=$TF_STATE_BUCKET" \
-            -backend-config="key=hollow-hour/$ENVIRONMENT/seasonal.tfstate" \
+            -backend-config="key=hollow-hour-example/$ENVIRONMENT/seasonal.tfstate" \
             -backend-config="region=$TF_VAR_aws_region"
           tofu -chdir="$dir" plan -input=false -no-color -out=seasonal.tfplan
           if [ "$APPLY" = true ]; then tofu -chdir="$dir" apply -input=false seasonal.tfplan; fi
@@ -129,11 +129,11 @@ jobs:
           APPLY: ${{ inputs.apply }}
         run: |
           set -euo pipefail
-          export TF_VAR_seasonal_state="{bucket=\"$TF_STATE_BUCKET\",key=\"hollow-hour/$ENVIRONMENT/seasonal.tfstate\",region=\"$TF_VAR_aws_region\"}"
+          export TF_VAR_seasonal_state="{bucket=\"$TF_STATE_BUCKET\",key=\"hollow-hour-example/$ENVIRONMENT/seasonal.tfstate\",region=\"$TF_VAR_aws_region\"}"
           dir="envs/$ENVIRONMENT"
           tofu -chdir="$dir" init -input=false -lockfile=readonly \
             -backend-config="bucket=$TF_STATE_BUCKET" \
-            -backend-config="key=hollow-hour/$ENVIRONMENT/flows.tfstate" \
+            -backend-config="key=hollow-hour-example/$ENVIRONMENT/flows.tfstate" \
             -backend-config="region=$TF_VAR_aws_region"
           tofu -chdir="$dir" plan -input=false -no-color -out=flows.tfplan
           if [ "$APPLY" = true ]; then tofu -chdir="$dir" apply -input=false flows.tfplan; fi

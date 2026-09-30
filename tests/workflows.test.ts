@@ -147,7 +147,7 @@ describe("deploy.yml applies one environment, by hand", () => {
   });
 
   it("serializes each environment and never cancels an apply", () => {
-    expect(deploy).toContain("group: hollow-hour-${{ inputs.environment }}");
+    expect(deploy).toContain("group: hollow-hour-example-${{ inputs.environment }}");
     expect(deploy).toContain("cancel-in-progress: false");
     // The provider repository's lane; sharing it would queue behind acceptance.
     expect(deploy).not.toMatch(/group:\s*sandbox-acceptance/);
