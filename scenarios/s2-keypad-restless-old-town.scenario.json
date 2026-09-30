@@ -1,0 +1,57 @@
+{
+  "scenario": "0.1",
+  "name": "s2-keypad-restless-old-town",
+  "description": "S2. Mrs. Alder calls from her known number, says nobody is hurt, and answers the keypad interview: it moves things and she has heard it, nothing else. The classifier returns grade 2, Restless, and she picks Old Town, so the contact reaches hh-district-old-town and its crew queue. Runs against the deployed deterministic stub Lambdas, which are not substituted. The Old Town hours are substituted with the always-open hours behind hours:the-dead, so the run does not depend on the time of day in qa or prod. The test ends at the queue transfer (endTest defaults to true), so the contact never reaches an agent.",
+  "entryPoint": {
+    "channel": "voice",
+    "flow": "${cdref:flow:hh-hotline-main}",
+    "sourcePhoneNumber": "+14135550142"
+  },
+  "substitutions": [
+    {
+      "actionType": "CheckHoursOfOperation",
+      "actionParameters": { "HoursOfOperationId": "${cdref:hours:old-town}" },
+      "substitute": "${cdref:hours:the-dead}"
+    }
+  ],
+  "steps": [
+    { "kind": "expect-prompt", "contains": "Calls are recorded" },
+    { "kind": "expect-prompt", "contains": "call your local emergency number" },
+    { "kind": "expect-lambda", "lambda": "${cdref:lambda:caller-lookup}" },
+    { "kind": "expect-prompt", "contains": "Welcome back, Mrs. Alder" },
+    { "kind": "expect-prompt", "contains": "is anyone hurt?" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-prompt", "contains": "Can you see it right now?" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-prompt", "contains": "Has it moved anything?" },
+    { "kind": "send-dtmf", "value": "1" },
+    { "kind": "expect-prompt", "contains": "Is there a cold spot" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-prompt", "contains": "Have you heard it?" },
+    { "kind": "send-dtmf", "value": "1" },
+    { "kind": "expect-prompt", "contains": "Has it touched anyone?" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-prompt", "contains": "more than one of them?" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-lambda", "lambda": "${cdref:lambda:classify-apparition}" },
+    { "kind": "expect-prompt", "contains": "this is a Restless case" },
+    { "kind": "expect-prompt", "contains": "For Old Town, press 1" },
+    { "kind": "send-dtmf", "value": "1" },
+    { "kind": "expect-hours-check", "hours": "${cdref:hours:old-town}" },
+    { "kind": "expect-transfer", "queue": "${cdref:queue:old-town-crew}" },
+    {
+      "kind": "assert",
+      "path": "$.Attributes.callerName",
+      "operator": "Equals",
+      "value": "Mrs. Alder"
+    },
+    { "kind": "assert", "path": "$.Attributes.grade", "operator": "Equals", "value": "2" },
+    {
+      "kind": "assert",
+      "path": "$.Attributes.gradeName",
+      "operator": "Equals",
+      "value": "Restless"
+    },
+    { "kind": "assert", "path": "$.Attributes.district", "operator": "Equals", "value": "old-town" }
+  ]
+}

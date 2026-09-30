@@ -1,0 +1,258 @@
+{
+  "$comment": "Every reference key the flows make, in one place. `npm run generate` expands it with districts.config.json into refs/<profile>.tfmap.json, and `npm run generate:check` fails when a committed map differs. binding address-map: the key is bound per profile to a Terraform address in envs/<environment>/. binding in-set: the flow or module is in the emitted set, so the emitter binds it itself and the maps carry no entry. Tiers stretch and 3 are listed so the names are settled, and stay out of the maps until their tier starts. {slug} expands once per district.",
+  "profiles": {
+    "dev": {
+      "environment": "dev",
+      "season": "standard"
+    },
+    "qa": {
+      "environment": "qa",
+      "season": "standard"
+    },
+    "prod": {
+      "environment": "prod",
+      "season": "standard"
+    },
+    "prod-october": {
+      "environment": "prod",
+      "season": "october"
+    }
+  },
+  "refs": [
+    {
+      "key": "queue:{slug}-crew",
+      "tier": 1,
+      "binding": "address-map",
+      "address": {
+        "default": "aws_connect_queue.crew[\"{slug}\"].arn"
+      },
+      "usedBy": ["hh-district-{slug}", "hh-queue-experience-* (as the overflow sibling)"]
+    },
+    {
+      "key": "queue:lantern-crew",
+      "tier": 1,
+      "binding": "address-map",
+      "address": {
+        "default": "aws_connect_queue.shared[\"lantern-crew\"].arn"
+      },
+      "usedBy": ["hh-hotline-main (Hostile and Chorus grades)"],
+      "note": "Bo's crew, for the Hostile and Chorus grades."
+    },
+    {
+      "key": "queue:dispatch-overflow",
+      "tier": 1,
+      "binding": "address-map",
+      "address": {
+        "default": "aws_connect_queue.shared[\"dispatch-overflow\"].arn"
+      },
+      "usedBy": [
+        "hh-district-{slug} (error fallback)",
+        "callbacks when a crew queue is full (tier 2)"
+      ]
+    },
+    {
+      "key": "queue:the-dead",
+      "tier": 2,
+      "binding": "address-map",
+      "address": {
+        "default": "aws_connect_queue.shared[\"the-dead\"].arn"
+      },
+      "usedBy": ["hh-dead-line"]
+    },
+    {
+      "key": "hours:{slug}",
+      "tier": 1,
+      "binding": "address-map",
+      "address": {
+        "default": "aws_connect_hours_of_operation.night_shift.arn",
+        "dev": "aws_connect_hours_of_operation.always_open.arn",
+        "prod-october": "aws_connect_hours_of_operation.always_open.arn"
+      },
+      "usedBy": ["hh-district-{slug}"],
+      "note": "Living crews keep the night shift (4 pm to 6 am) except in October and in dev."
+    },
+    {
+      "key": "hours:the-dead",
+      "tier": 2,
+      "binding": "address-map",
+      "address": {
+        "default": "aws_connect_hours_of_operation.always_open.arn"
+      },
+      "usedBy": ["hh-dead-line"],
+      "note": "The dead never close."
+    },
+    {
+      "key": "lambda:caller-lookup",
+      "tier": 1,
+      "binding": "address-map",
+      "address": {
+        "default": "aws_connect_lambda_function_association.stub[\"caller-lookup\"].function_arn"
+      },
+      "usedBy": ["hh-hotline-main"]
+    },
+    {
+      "key": "lambda:classify-apparition",
+      "tier": 1,
+      "binding": "address-map",
+      "address": {
+        "default": "aws_connect_lambda_function_association.stub[\"classify-apparition\"].function_arn"
+      },
+      "usedBy": ["hh-hotline-main"]
+    },
+    {
+      "key": "lambda:crew-eta",
+      "tier": 1,
+      "binding": "address-map",
+      "address": {
+        "default": "aws_connect_lambda_function_association.stub[\"crew-eta\"].function_arn"
+      },
+      "usedBy": ["hh-queue-experience-{slug}"]
+    },
+    {
+      "key": "lambda:plane-check",
+      "tier": 2,
+      "binding": "address-map",
+      "address": {
+        "default": "aws_connect_lambda_function_association.stub[\"plane-check\"].function_arn"
+      },
+      "usedBy": ["hh-hotline-main"]
+    },
+    {
+      "key": "lambda:prank-score",
+      "tier": 2,
+      "binding": "address-map",
+      "address": {
+        "default": "aws_connect_lambda_function_association.stub[\"prank-score\"].function_arn"
+      },
+      "usedBy": ["hh-hotline-main"]
+    },
+    {
+      "key": "lambda:district-for-address",
+      "tier": 2,
+      "binding": "address-map",
+      "address": {
+        "default": "aws_connect_lambda_function_association.stub[\"district-for-address\"].function_arn"
+      },
+      "usedBy": ["hh-collect-address"]
+    },
+    {
+      "key": "module:greeting@live",
+      "tier": 1,
+      "binding": "address-map",
+      "address": {
+        "default": "data.terraform_remote_state.seasonal.outputs.greeting_standard_live_arn",
+        "prod-october": "data.terraform_remote_state.seasonal.outputs.greeting_halloween_live_arn"
+      },
+      "usedBy": ["hh-hotline-main"],
+      "note": "Out of set on purpose: the greetings live in seasonal/ and envs/seasonal-<environment>/, and the season is this one binding."
+    },
+    {
+      "key": "prompt:salt-line-tips",
+      "tier": 2,
+      "binding": "address-map",
+      "address": {
+        "default": "awscc_connect_prompt.salt_line_tips.prompt_arn"
+      },
+      "usedBy": ["hh-queue-experience-{slug}"]
+    },
+    {
+      "key": "flow:hh-district-menu",
+      "tier": 1,
+      "binding": "in-set",
+      "usedBy": ["hh-hotline-main (grades a district crew takes)"],
+      "note": "Generated from districts.config.json, one key per district."
+    },
+    {
+      "key": "flow:hh-district-{slug}",
+      "tier": 1,
+      "binding": "in-set",
+      "usedBy": ["hh-district-menu"]
+    },
+    {
+      "key": "flow:hh-queue-experience-{slug}",
+      "tier": 1,
+      "binding": "in-set",
+      "usedBy": [
+        "hh-district-{slug} (CustomerQueue hook)",
+        "hh-district-* (CustomerQueue hook, when that district overflows here)"
+      ]
+    },
+    {
+      "key": "flow:hh-customer-whisper",
+      "tier": 1,
+      "binding": "in-set",
+      "usedBy": ["hh-district-{slug}, hh-district-menu, hh-hotline-main (CustomerWhisper hook)"]
+    },
+    {
+      "key": "flow:hh-agent-whisper",
+      "tier": 1,
+      "binding": "in-set",
+      "usedBy": ["hh-district-{slug}, hh-district-menu, hh-hotline-main (AgentWhisper hook)"]
+    },
+    {
+      "key": "flow:hh-customer-hold",
+      "tier": 2,
+      "binding": "in-set",
+      "usedBy": ["hh-district-{slug} (CustomerHold hook)"]
+    },
+    {
+      "key": "flow:hh-agent-hold",
+      "tier": 2,
+      "binding": "in-set",
+      "usedBy": ["hh-district-{slug}, hh-dead-line (AgentHold hook)"]
+    },
+    {
+      "key": "flow:hh-dead-line",
+      "tier": 2,
+      "binding": "in-set",
+      "usedBy": ["hh-hotline-main"]
+    },
+    {
+      "key": "flow:hh-dead-whisper",
+      "tier": 2,
+      "binding": "in-set",
+      "usedBy": ["hh-dead-line (AgentWhisper hook)"]
+    },
+    {
+      "key": "flow:hh-dead-hold",
+      "tier": 2,
+      "binding": "in-set",
+      "usedBy": ["hh-dead-line (CustomerHold hook)"]
+    },
+    {
+      "key": "flow:hh-dead-queue-experience",
+      "tier": 2,
+      "binding": "in-set",
+      "usedBy": ["hh-dead-line (CustomerQueue hook)"]
+    },
+    {
+      "key": "module:hh-collect-address",
+      "tier": 2,
+      "binding": "in-set",
+      "usedBy": ["hh-hotline-main"]
+    },
+    {
+      "key": "module:hh-offer-callback",
+      "tier": 2,
+      "binding": "in-set",
+      "usedBy": ["hh-district-{slug}"]
+    },
+    {
+      "key": "lex:apparition-id",
+      "tier": "stretch",
+      "binding": "address-map",
+      "address": {
+        "default": "awscc_lex_bot_alias.apparition_id.arn"
+      },
+      "usedBy": ["hh-hotline-main (conversational interview)"],
+      "note": "Owner decision 2026-09-30: Lex is a stretch goal and the keypad interview is the baseline. The address is a placeholder until a bot alias exists in dev; the attribute is checked against awscc then."
+    },
+    {
+      "key": "view:field-guide",
+      "tier": 3,
+      "binding": "address-map",
+      "usedBy": ["hh-field-guide-chat"],
+      "note": "Tier 3, after the season. Bound to the AWS-managed Cards view; which resource or data source exposes its ARN is settled when the tier starts, so there is no address yet."
+    }
+  ]
+}
