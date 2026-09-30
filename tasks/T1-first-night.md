@@ -86,6 +86,36 @@ the environment, never committed>` exits 0 for each; and scenario S2
     below is part of this criterion.
 11. The README shows the keypad scene and the dev, qa, prod comparison.
 
+## Where the criteria stand (2026-09-30)
+
+- [x] 1 to 9 and 11: offline, held by `npm run check` (lint, types,
+      `generate:check`, `lint:flows`, and `npm test`, which runs
+      `tests/validate.test.ts` when OpenTofu is on PATH), green on
+      2026-09-30 with the Compare workaround in place (VERIFY.md, C1).
+- [ ] 10, in part:
+  - [x] `envs/bootstrap` applied: dev (us-west-2), qa and prod (us-east-1)
+        instances and the state bucket. qa was refused on the first apply with
+        `ServiceQuotaExceededException` and created by a re-apply
+        (envs/README.md, Bootstrap).
+  - [x] dev and qa applied, each to its own instance: 6 resources in each
+        seasonal root and 55 in each flow root. By hand with the operator's
+        credentials, as a saved plan then apply, not through `deploy.yml`,
+        which has never run; so the deploy role's action list is still not
+        exercised.
+  - [ ] prod: pending the owner's apply.
+  - [ ] `flow-cli diff flows/ --instance <ARN>` exits 0: it does not. On dev
+        it reported 8 of the 10 flows as changed only because 0.2.0 names a
+        live reference after the physical resource (envs/README.md, Checking
+        drift). `flow-cli diff seasonal/` exited 0. In its place,
+        `npm run drift -- dev` and `npm run drift -- qa` each reported all 12
+        FlowDocs unchanged at 19:57 UTC. The criterion stays open until the
+        CLI can map references, or is amended to name the drift check.
+  - [x] S2 passed as an operator run against dev with the stub Lambdas:
+        19:48:20 to 19:50:00 UTC, exit 0, JUnit tests=1 failures=0 (VERIFY.md,
+        S2). On qa it could not start ("Failed to start execution of test
+        case due to limit reached."); the likely cause is the qa instance's
+        "Concurrent active calls per instance" quota of 0.
+
 ## Assumptions
 
 - Flows are authored as FlowDocs with `.flow.ts` companions; the typed builder
@@ -100,28 +130,25 @@ the environment, never committed>` exits 0 for each; and scenario S2
 
 ## Sandbox checklist (criterion 10)
 
-Not done: nothing has been deployed. Each item is recorded, dated, in
-`VERIFY.md` (status `sandbox-checked <date>, <message>`) and here.
+Each item is recorded, dated, in `VERIFY.md` (status
+`sandbox-checked <date>, <region>: <result>`) and here. As of 2026-09-30:
 
-- Owner setup first: apply `envs/bootstrap` (the three instances and the
-  state bucket; `envs/README.md`, "Bootstrap"), one OIDC deploy role per
-  environment with the actions in `envs/README.md`, and the GitHub
-  environments' variables (now including `TF_STATE_REGION`) with a reviewer
-  on prod.
-- Dispatch `deploy.yml` with `apply` for dev, then qa, then prod. Record H1
-  and H2 (the hours), 7b (the hand-written module version and alias), L2 and
-  L3 (the Lambda association), I5 (the 5 second interrupt on `moving`; fall
-  back to 10 or 30 if refused) and Q2 (the queue cap) from the dev apply.
-- `flow-cli diff flows/ --instance <ARN from the environment>` exits 0 for
-  each environment.
-- Run S2 against dev (`node scenarios/resource-map.mjs dev`, then
-  `flow-cli simulate`). It is the gate for L1: its `callerName` and
-  `gradeName` asserts read back the spoken values the JSON-validated
-  Lambdas return, and a refused response shows as the classify error path.
-  Record S2 and L1.
-- Fill a dev crew queue with two test contacts and place a third call to hear
-  the overflow to the sibling crew, and a move from the queue flow; record
-  Q1 (which queue flow plays after the dequeue).
+- [ ] Owner setup: `envs/bootstrap` is applied (done); the OIDC deploy role
+      per environment and the GitHub environments' variables, with a
+      reviewer on prod, are not yet in place.
+- [ ] Dispatch `deploy.yml` with `apply` for dev, then qa, then prod. dev
+      and qa were applied by hand instead; prod is pending. From the dev
+      apply and the probes on dev: H1, H2, 7b, L2, L3 and I5 are recorded
+      (I5: 5 accepted, so `moving` keeps it); the apply also found C1 (the
+      Compare NextAction). Q2 (the queue cap) is not recorded.
+- [ ] `flow-cli diff flows/ --instance <ARN from the environment>` exits 0
+      for each environment: not while 0.2.0 names references after the
+      physical resource; `npm run drift` is clean on dev and qa.
+- [x] Run S2 against dev: passed; S2 and L1 are recorded. qa: not started
+      by the service (the call quota above).
+- [ ] Fill a dev crew queue with two test contacts and place a third call to
+      hear the overflow to the sibling crew, and a move from the queue flow;
+      record Q1 (which queue flow plays after the dequeue).
 
 ## Deviations (2026-09-30)
 
@@ -152,8 +179,8 @@ Where the build departs from the scope above, and why.
   `tests/flows.test.ts` walks every path and fails when a queue is targeted or
   a queue flow hooked under another crew's name.
 - **The move's loop prompt interrupts after 5 seconds**, not 30: the caller
-  who pressed 1 should not wait half a minute to move. The value is unchecked
-  (VERIFY I5), and the hold loop keeps 30.
+  who pressed 1 should not wait half a minute to move. The service accepted
+  "5" on dev on 2026-09-30 (VERIFY I5), and the hold loop keeps 30.
 - **Lambda contracts.** caller-lookup, classify-apparition and crew-eta are
   invoked with `JSON` response validation, because each returns spoken values
   with spaces and punctuation and validation covers the whole response
@@ -181,3 +208,11 @@ Where the build departs from the scope above, and why.
   with `use_lockfile=true`, to every `-backend-config` and to
   `TF_VAR_seasonal_state`. The bootstrap root's own state starts local and is
   migrated into the bucket it creates.
+- **The Compares are generic blocks for now.** Connect refused every typed
+  Compare the first dev apply sent, because flow-as-code 0.2.0 writes no
+  `Transitions.NextAction` for it (VERIFY C1). `check-moved` in
+  `generators/flows.ts` and `check-caller` and `check-grade` in
+  `hh-hotline-main` are GenericBlock Compares whose `next` is their
+  NoMatchingCondition target. The fix belongs upstream in flow-as-code and is
+  not yet released; remove the workaround after upgrading to the release
+  whose changelog records that Compare writes NextAction.

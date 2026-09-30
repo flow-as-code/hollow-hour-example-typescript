@@ -7,15 +7,17 @@ typed TypeScript companions, deployed to three environments on three Connect
 instances, where every difference between those environments, the Halloween
 season included, is a reference binding rather than an edit to a flow.
 
-> Status: **Tier 1 built, not yet deployed** (task T1). The Tier 1 flows, the
-> stub Lambdas and all seven roots (six environment roots plus
-> `envs/bootstrap`) are in place and pass every offline check,
-> `tofu validate` included. Nothing is deployed yet: the first step, and the
-> one everything live waits on, is the operator's apply of `envs/bootstrap`
-> ([envs/README.md, Bootstrap](envs/README.md#bootstrap)), which creates the
-> three instances and the state bucket. The deploy of dev, qa and prod and the
-> operator run of scenario S2 (T1 criterion 10) follow it. See
-> [Tiers and status](#tiers-and-status).
+> Status: **Tier 1 live in dev and qa** (task T1, 2026-09-30). The bootstrap
+> root created the three instances and the state bucket, and dev and qa are
+> applied: 6 resources in each seasonal root and 55 in each flow root, with
+> every FlowDoc matching what is live (`npm run drift`). Scenario S2 passed on
+> dev; on qa it could not start (VERIFY.md, S2). prod is pending the owner's
+> apply. See [Tiers and status](#tiers-and-status).
+>
+> The deploy found that Amazon Connect refuses a Compare with no
+> `Transitions.NextAction`, which flow-as-code 0.2.0's typed Compare does not
+> write. The Compares here are generic blocks that carry it until the release
+> with the upstream fix ([VERIFY.md, row C1](VERIFY.md#the-table)).
 
 ## The premise
 
@@ -221,15 +223,21 @@ tofu -chdir=envs/seasonal-dev init \
   -backend-config="key=hollow-hour-example/dev/seasonal.tfstate" \
   -backend-config="region=us-east-1" \
   -backend-config="use_lockfile=true"
-tofu -chdir=envs/seasonal-dev apply
+tofu -chdir=envs/seasonal-dev plan -out=seasonal.tfplan
+tofu -chdir=envs/seasonal-dev apply seasonal.tfplan
 
 tofu -chdir=envs/dev init \
   -backend-config="bucket=<state bucket>" \
   -backend-config="key=hollow-hour-example/dev/flows.tfstate" \
   -backend-config="region=us-east-1" \
   -backend-config="use_lockfile=true"
-tofu -chdir=envs/dev apply
+tofu -chdir=envs/dev plan -out=flows.tfplan
+tofu -chdir=envs/dev apply flows.tfplan
 ```
+
+Apply the saved plan you read, as `deploy.yml` does, never
+`apply -auto-approve`. `npm run drift -- dev` then checks every FlowDoc
+against what is live ([envs/README.md, Checking drift](envs/README.md#checking-drift)).
 
 Each root commits its `.terraform.lock.hcl` with hashes for Linux and macOS
 on amd64 and arm64, so init installs only the reviewed provider builds;
@@ -267,12 +275,12 @@ instance yet.
 
 ## Tiers and status
 
-| Tier | Name          | Scope                                                                                                                                                        | Status                     |
-| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- |
-| T0   | Scaffold      | Layout, toolchain, CI, environment roots, reference manifest, VERIFY.md                                                                                      | done; owner setup open     |
-| T1   | First night   | Main line with keypad triage and interview, generated district and queue flows, whispers, seasonal greetings, supporting resources in all three environments | built; live deploy pending |
-| T2   | Full moon     | Address and callback modules, holds, prank screen, the Queue of the Dead, scenarios                                                                          | not started                |
-| T3   | Witching hour | Chat field guide, outbound follow-ups, transfers to named crew, the drift scene                                                                              | after the season           |
+| Tier | Name          | Scope                                                                                                                                                        | Status                           |
+| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
+| T0   | Scaffold      | Layout, toolchain, CI, environment roots, reference manifest, VERIFY.md                                                                                      | done; owner setup open           |
+| T1   | First night   | Main line with keypad triage and interview, generated district and queue flows, whispers, seasonal greetings, supporting resources in all three environments | live in dev and qa; prod pending |
+| T2   | Full moon     | Address and callback modules, holds, prank screen, the Queue of the Dead, scenarios                                                                          | not started                      |
+| T3   | Witching hour | Chat field guide, outbound follow-ups, transfers to named crew, the drift scene                                                                              | after the season                 |
 
 Each tier's acceptance criteria are in [`tasks/`](tasks/).
 

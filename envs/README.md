@@ -64,15 +64,19 @@ aws connect list-instances --region us-west-2
 
 The first apply has no bucket to hold its state, so it runs on local state
 through a gitignored override, then moves that state into the bucket it has
-just created. It needs OpenTofu 1.10 or later (`use_lockfile`), and
-credentials that can create Connect instances (with the directory and
-service-linked role they bring) and S3 buckets.
+just created. It needs OpenTofu 1.10 or later (`use_lockfile`) installed as
+`tofu` on PATH (the commands here and `npm run validate` call it by that
+name; see [Installing OpenTofu](https://opentofu.org/docs/intro/install/),
+and check with `tofu version`), and credentials that can create Connect
+instances (with the directory and service-linked role they bring) and S3
+buckets.
 
 ```sh
 cd envs/bootstrap
 printf 'terraform {\n  backend "local" {}\n}\n' > local_override.tf
 tofu init
-tofu apply        # waits until each instance is ACTIVE
+tofu plan -out=bootstrap.tfplan
+tofu apply bootstrap.tfplan   # waits until each instance is ACTIVE
 
 bucket=$(tofu output -raw state_bucket)
 state_region=$(tofu output -raw state_region)
@@ -84,6 +88,17 @@ tofu init -migrate-state -force-copy \
   -backend-config="use_lockfile=true"
 tofu state list   # reads from the bucket now
 ```
+
+Creating several instances in one apply can be refused for one of them
+while the others are still being created. On 2026-09-30 the first bootstrap
+apply created dev (us-west-2) and prod (us-east-1), and refused qa
+(us-east-1) with `ServiceQuotaExceededException: Currently pending instance
+creation requests, if successfully executed, will reach instance count quota
+for account: <account> Please retry once pending requests have completed and
+quota limit is not reached.` (status 402), although us-east-1 had no
+instance before the apply. Once the others were ACTIVE, planning and
+applying again created qa. The other resources in the apply are unaffected,
+so run the migration below after the retry, not before.
 
 Confirm the state object is in the bucket too:
 
@@ -223,6 +238,61 @@ documentation is the authority when it adds one. This list comes from the
 resources the roots declare and has not yet been exercised by a live apply
 (T1 criterion 10): the first apply of dev records any refusal in
 [`VERIFY.md`](../VERIFY.md) and here.
+
+## Deploying by hand
+
+The same sequence `deploy.yml` runs, for one environment: plan to a file,
+read the plan, then apply that saved plan, so what is applied is exactly
+what was reviewed. Never `apply -auto-approve`.
+
+```sh
+npm run emit:<profile>
+tofu -chdir=envs/seasonal-<environment> init -backend-config=...   # the four values
+tofu -chdir=envs/seasonal-<environment> plan -out=seasonal.tfplan
+tofu -chdir=envs/seasonal-<environment> apply seasonal.tfplan
+tofu -chdir=envs/<environment> init -backend-config=...
+tofu -chdir=envs/<environment> plan -out=flows.tfplan
+tofu -chdir=envs/<environment> apply flows.tfplan
+```
+
+The `.tfplan` files are gitignored. A plan is refused at apply time once
+the state has changed since it was made; plan again.
+
+A `.terraform/` directory made before the repository was moved to another
+path can still point at the old location. Delete them all and init again
+with the same `-backend-config` values: `rm -rf envs/*/.terraform`.
+
+## Checking drift
+
+`npm run drift -- <profile>` compares every FlowDoc in `flows/` and
+`seasonal/` with the flow or module of the same name on that profile's
+instance, action by action, and exits 1 on any difference. It reads the
+instance from `TF_VAR_connect_instance_id` and `TF_VAR_aws_region`, or else
+from the gitignored `.live/instances.json` (`{ "<environment>": { "id",
+"region" } }`), and only lists and describes flows and modules. With
+`scenarios/<profile>.resources.json` present (`node scenarios/resource-map.mjs
+<profile>`), each reference is compared through the keys that bind it, so a
+reference moved to another resource is drift. A reference the map does not
+bind keeps its own identity (the token's key, or a short hash of the ARN), so
+two unmapped references never compare equal. Without the map, only its type is
+compared. An error message is printed with ARNs, ids and account ids redacted.
+`tests/drift.test.ts` holds the normalizer.
+
+Use it instead of `flow-cli diff flows/ --instance <ARN>` for now. The
+0.2.0 CLI turns each live ARN into a token named after the physical
+resource (`queue:hh-dev-old-town-crew`) while the FlowDocs use the logical
+key (`queue:old-town-crew`), and it has no option to map one to the other,
+so it reports every flow that carries a reference as changed. On 2026-09-30
+(UTC) it reported 8 of the 10 dev flows as changed, with no difference but
+those names, and exited 1; at 19:57 UTC `npm run drift -- dev` and
+`npm run drift -- qa` each reported all 12 FlowDocs unchanged and exited 0. `flow-cli diff seasonal/` has no references to rename
+and exits 0.
+
+Both need `@aws-sdk/client-connect`. It is an optional peer dependency of
+`@flow-as-code/cli`, loaded only by the commands that talk to an instance
+(`diff --instance`, `simulate`, `export`), so npm does not install it with
+the CLI. This repository pins it as an exact devDependency (3.1144.0), which
+`flow-cli diff`, `flow-cli simulate` and `npm run drift` all use.
 
 ## First apply
 
