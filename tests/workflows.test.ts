@@ -176,6 +176,15 @@ describe("deploy.yml applies one environment, by hand", () => {
     expect(deploy.match(/init -input=false -lockfile=readonly/g)).toHaveLength(2);
   });
 
+  it("reads state from the bucket's own Region with a lock object, not the instance's Region", () => {
+    // One bucket (envs/bootstrap) serves every environment, and dev's
+    // instance is in another Region than the bucket.
+    expect(deploy.match(/-backend-config="region=\$TF_STATE_REGION"/g)).toHaveLength(2);
+    expect(deploy.match(/-backend-config="use_lockfile=true"/g)).toHaveLength(2);
+    expect(deploy).toContain('region=\\"$TF_STATE_REGION\\"}');
+    expect(deploy).not.toContain("region=$TF_VAR_aws_region");
+  });
+
   it("refuses to plan the flow root before the seasonal root has ever been applied", () => {
     const seasonal = deploy.indexOf("name: Seasonal root");
     const guard = deploy.indexOf("if: steps.seasonal.outputs.applied != 'true'");

@@ -95,16 +95,19 @@ the environment, never committed>` exits 0 for each; and scenario S2
   on the flowascode path (checked by the synthesis on 2026-09-30; re-checked
   here by criterion 1).
 - The instance quota for three live environments is resolved by the owner
-  before criterion 10 (VERIFY H3).
+  before criterion 10 (VERIFY H3). Resolved 2026-09-30 by Region: dev in
+  us-west-2, qa and prod in us-east-1, each within the default quota of two.
 
 ## Sandbox checklist (criterion 10)
 
 Not done: nothing has been deployed. Each item is recorded, dated, in
 `VERIFY.md` (status `sandbox-checked <date>, <message>`) and here.
 
-- Owner setup first: a third Connect instance (VERIFY H3), one OIDC deploy
-  role per environment with the actions in `envs/README.md`, the state
-  bucket, and the GitHub environments' variables with a reviewer on prod.
+- Owner setup first: apply `envs/bootstrap` (the three instances and the
+  state bucket; `envs/README.md`, "Bootstrap"), one OIDC deploy role per
+  environment with the actions in `envs/README.md`, and the GitHub
+  environments' variables (now including `TF_STATE_REGION`) with a reviewer
+  on prod.
 - Dispatch `deploy.yml` with `apply` for dev, then qa, then prod. Record H1
   and H2 (the hours), 7b (the hand-written module version and alias), L2 and
   L3 (the Lambda association), I5 (the 5 second interrupt on `moving`; fall
@@ -171,3 +174,10 @@ Where the build departs from the scope above, and why.
   not `.stub`: it associates the real deployed function with the instance,
   and the old address read as a placeholder. It pairs with
   `aws_lambda_permission.connect`; the address maps bind `lambda:<name>` to it.
+- **The instances and the state bucket are code** (`envs/bootstrap`), not
+  owner setup by hand, so a clone can reproduce them. One bucket, in
+  `us-east-1`, holds every root's state, so the state Region is no longer the
+  instance's: `deploy.yml` takes a `TF_STATE_REGION` variable and passes it,
+  with `use_lockfile=true`, to every `-backend-config` and to
+  `TF_VAR_seasonal_state`. The bootstrap root's own state starts local and is
+  migrated into the bucket it creates.

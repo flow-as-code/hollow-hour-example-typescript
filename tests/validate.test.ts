@@ -4,7 +4,7 @@
  */
 // `tofu init -backend=false` and `tofu validate` over all six roots, each with
 // the flows.tf its profile emits in place, plus envs/prod with the October
-// profile's. Gated: skipped when OpenTofu is not on PATH (or TOFU names none),
+// profile's, and envs/bootstrap, which has no flows. Gated: skipped when OpenTofu is not on PATH (or TOFU names none),
 // when the registry cannot be reached, or when HH_SKIP_TOFU=1. No
 // credentials, no backend, no AWS call; providers are cached in .tofu-cache/.
 //
@@ -40,9 +40,10 @@ const ROOTS = [
   { name: "qa", from: "qa", profile: "qa" },
   { name: "prod", from: "prod", profile: "prod" },
   { name: "prod-october", from: "prod", profile: "prod-october" },
-  { name: "seasonal-dev", from: "seasonal-dev" },
-  { name: "seasonal-qa", from: "seasonal-qa" },
-  { name: "seasonal-prod", from: "seasonal-prod" },
+  { name: "seasonal-dev", from: "seasonal-dev", set: "seasonal" },
+  { name: "seasonal-qa", from: "seasonal-qa", set: "seasonal" },
+  { name: "seasonal-prod", from: "seasonal-prod", set: "seasonal" },
+  { name: "bootstrap", from: "bootstrap", set: "none" },
 ] as const;
 
 function tofuVersion(): string | undefined {
@@ -123,12 +124,14 @@ describe.runIf(gate)(`tofu validate (${version ?? "no tofu"})`, () => {
       const dir = join(tree, "envs", root.name);
       mkdirSync(dir, { recursive: true });
       for (const f of readdirSync(join(ROOT, "envs", root.from))) {
-        if ((f.endsWith(".tf") && f !== "flows.tf") || f === ".terraform.lock.hcl")
-          copyFileSync(join(ROOT, "envs", root.from, f), join(dir, f));
+        const authored =
+          (f.endsWith(".tf") && f !== "flows.tf" && !f.endsWith("_override.tf")) ||
+          f === ".terraform.lock.hcl";
+        if (authored) copyFileSync(join(ROOT, "envs", root.from, f), join(dir, f));
       }
       if ("profile" in root)
         emitFlowsTf(flows, dir, join(ROOT, "refs", `${root.profile}.tfmap.json`));
-      else emitFlowsTf(seasonal, dir);
+      else if (root.set === "seasonal") emitFlowsTf(seasonal, dir);
     }
   }, 120_000);
 

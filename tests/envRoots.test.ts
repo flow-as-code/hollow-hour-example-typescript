@@ -75,12 +75,14 @@ function resolves(env: string, address: string): boolean {
 }
 
 describe("envs/", () => {
-  it("has a flow root and a seasonal root per environment, and nothing else", () => {
+  it("has a flow root and a seasonal root per environment, the bootstrap root, and nothing else", () => {
     const dirs = readdirSync(ENVS, { withFileTypes: true })
       .filter((d) => d.isDirectory() && !d.name.startsWith("."))
       .map((d) => d.name)
       .sort();
-    expect(dirs).toEqual([...ENVIRONMENTS, ...ENVIRONMENTS.map((e) => `seasonal-${e}`)].sort());
+    expect(dirs).toEqual(
+      [...ENVIRONMENTS, ...ENVIRONMENTS.map((e) => `seasonal-${e}`), "bootstrap"].sort(),
+    );
   });
 
   for (const group of [[...ENVIRONMENTS], ENVIRONMENTS.map((e) => `seasonal-${e}`)]) {

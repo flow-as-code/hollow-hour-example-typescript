@@ -11,6 +11,9 @@ name: deploy
 #              AWS_REGION           the instance's region
 #              CONNECT_INSTANCE_ID  the instance id (a UUID, masked in logs)
 #              TF_STATE_BUCKET      the S3 bucket holding this environment's state
+#              TF_STATE_REGION      that bucket's Region, which need not be the
+#                                   instance's (one bucket serves every
+#                                   environment; envs/bootstrap creates both)
 # None of them is written to a file, and the account id is masked.
 #
 # Order: the seasonal root first (the greeting modules and their `live`
@@ -98,6 +101,7 @@ jobs:
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          TF_STATE_REGION: ${{ vars.TF_STATE_REGION }}
           APPLY: ${{ inputs.apply }}
         run: |
           set -euo pipefail
@@ -105,7 +109,8 @@ jobs:
           tofu -chdir="$dir" init -input=false -lockfile=readonly \
             -backend-config="bucket=$TF_STATE_BUCKET" \
             -backend-config="key=hollow-hour-example/$ENVIRONMENT/seasonal.tfstate" \
-            -backend-config="region=$TF_VAR_aws_region"
+            -backend-config="region=$TF_STATE_REGION" \
+            -backend-config="use_lockfile=true"
           tofu -chdir="$dir" plan -input=false -no-color -out=seasonal.tfplan
           if [ "$APPLY" = true ]; then tofu -chdir="$dir" apply -input=false seasonal.tfplan; fi
           # The flow root reads this root's outputs through
@@ -126,14 +131,16 @@ jobs:
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          TF_STATE_REGION: ${{ vars.TF_STATE_REGION }}
           APPLY: ${{ inputs.apply }}
         run: |
           set -euo pipefail
-          export TF_VAR_seasonal_state="{bucket=\"$TF_STATE_BUCKET\",key=\"hollow-hour-example/$ENVIRONMENT/seasonal.tfstate\",region=\"$TF_VAR_aws_region\"}"
+          export TF_VAR_seasonal_state="{bucket=\"$TF_STATE_BUCKET\",key=\"hollow-hour-example/$ENVIRONMENT/seasonal.tfstate\",region=\"$TF_STATE_REGION\"}"
           dir="envs/$ENVIRONMENT"
           tofu -chdir="$dir" init -input=false -lockfile=readonly \
             -backend-config="bucket=$TF_STATE_BUCKET" \
             -backend-config="key=hollow-hour-example/$ENVIRONMENT/flows.tfstate" \
-            -backend-config="region=$TF_VAR_aws_region"
+            -backend-config="region=$TF_STATE_REGION" \
+            -backend-config="use_lockfile=true"
           tofu -chdir="$dir" plan -input=false -no-color -out=flows.tfplan
           if [ "$APPLY" = true ]; then tofu -chdir="$dir" apply -input=false flows.tfplan; fi

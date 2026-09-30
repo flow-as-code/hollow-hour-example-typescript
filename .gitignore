@@ -21,6 +21,12 @@ envs/*/flows.tf
 *.tfvars
 *.tfplan
 .tofu-cache/
+# The bootstrap root's first apply runs on local state through this override
+# (envs/README.md, "Bootstrap"); it is deleted before the state is migrated.
+*_override.tf
+
+# Live ids for the operator's later steps (instance ids, the bucket name).
+.live/
 
 # Simulate resource maps hold ARNs, so they stay on the operator's machine.
 scenarios/*.resources.json

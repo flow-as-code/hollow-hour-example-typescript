@@ -159,7 +159,8 @@ describe("the seasonal roots", () => {
 });
 
 describe("provider pins", () => {
-  for (const dir of readdirSync(ENVS).filter((d) => !d.endsWith(".md"))) {
+  // envs/bootstrap creates the instances and the state bucket, no flow.
+  for (const dir of readdirSync(ENVS).filter((d) => !d.endsWith(".md") && d !== "bootstrap")) {
     it(`${dir}: takes the published flowascode provider within 0.1`, () => {
       expect(read(dir, "providers.tf")).toMatch(
         /flowascode = \{\s*source\s*= "flow-as-code\/flowascode"\s*version = "~> 0\.1\.1"/,

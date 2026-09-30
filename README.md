@@ -182,13 +182,13 @@ providers from the registry the first time (about a minute; cached in
 
 ### Deploying to your own instance
 
-Before the first deploy you need, in the account and Region of each
-environment:
+Before the first deploy you need:
 
-- a Connect instance per environment. The default quota is two instances per
-  Region (VERIFY.md, H3), so a third needs a quota increase, a second Region or
-  a second account;
-- an S3 bucket for state, created beforehand; the roots name no bucket;
+- a Connect instance per environment and an S3 bucket for state.
+  [`envs/bootstrap`](envs/README.md#bootstrap) creates both: dev in
+  `us-west-2`, qa and prod in `us-east-1`, and the bucket in `us-east-1` by
+  default. The default quota is two instances per account and Region
+  (VERIFY.md, H3), which is why the three are split across two Regions;
 - credentials whose role can do what the roots do: read the instance
   (`connect:DescribeInstance`); create and delete Connect queues, hours of
   operation, flows, flow modules and their versions and aliases, and Lambda
@@ -204,8 +204,10 @@ can be planned: the flow root reads the greeting alias ARNs from its state.
 `deploy.yml` refuses to plan the flow root until that has happened.
 
 ```sh
-export TF_VAR_aws_region=us-east-1
-export TF_VAR_connect_instance_id=<your instance id>
+# From `tofu -chdir=envs/bootstrap output`: dev's instance and Region, and
+# the state bucket and its Region, which is not dev's.
+export TF_VAR_aws_region=us-west-2
+export TF_VAR_connect_instance_id=<dev instance id>
 export TF_VAR_seasonal_state='{bucket="<state bucket>",key="hollow-hour-example/dev/seasonal.tfstate",region="us-east-1"}'
 
 npm run emit:dev    # or emit:qa, emit:prod, emit:prod-october
@@ -213,13 +215,15 @@ npm run emit:dev    # or emit:qa, emit:prod, emit:prod-october
 tofu -chdir=envs/seasonal-dev init \
   -backend-config="bucket=<state bucket>" \
   -backend-config="key=hollow-hour-example/dev/seasonal.tfstate" \
-  -backend-config="region=us-east-1"
+  -backend-config="region=us-east-1" \
+  -backend-config="use_lockfile=true"
 tofu -chdir=envs/seasonal-dev apply
 
 tofu -chdir=envs/dev init \
   -backend-config="bucket=<state bucket>" \
   -backend-config="key=hollow-hour-example/dev/flows.tfstate" \
-  -backend-config="region=us-east-1"
+  -backend-config="region=us-east-1" \
+  -backend-config="use_lockfile=true"
 tofu -chdir=envs/dev apply
 ```
 

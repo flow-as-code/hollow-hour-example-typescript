@@ -7,7 +7,8 @@
 // npm run validate: `tofu init -backend=false` and `tofu validate` of every
 // environment root, each with the flows.tf its profile emits in place:
 // envs/dev, envs/qa and envs/prod with their own profile, envs/prod again with
-// prod-october, and the three seasonal roots with the greetings.
+// prod-october, the three seasonal roots with the greetings, and
+// envs/bootstrap, which has no flows.
 //
 // It works on a temporary copy of the roots (with lambdas/ and
 // districts.config.json beside them, which the roots read) and emits into that
@@ -43,7 +44,13 @@ const ROOTS = [
   { name: "seasonal-dev", from: "seasonal-dev", set: "seasonal" },
   { name: "seasonal-qa", from: "seasonal-qa", set: "seasonal" },
   { name: "seasonal-prod", from: "seasonal-prod", set: "seasonal" },
+  { name: "bootstrap", from: "bootstrap" },
 ];
+
+/** A root's authored files: never flows.tf (emitted) or a local *_override.tf. */
+const authored = (f) =>
+  (f.endsWith(".tf") && f !== "flows.tf" && !f.endsWith("_override.tf")) ||
+  f === ".terraform.lock.hcl";
 
 // A stale map would validate yesterday's bindings, so refuse first.
 const check = spawnSync("npx", ["--no-install", "tsx", "generators/districts.ts", "--check"], {
@@ -64,10 +71,9 @@ try {
     const dir = join(tree, "envs", root.name);
     mkdirSync(dir, { recursive: true });
     for (const f of readdirSync(join(ROOT, "envs", root.from))) {
-      if ((f.endsWith(".tf") && f !== "flows.tf") || f === ".terraform.lock.hcl") {
-        copyFileSync(join(ROOT, "envs", root.from, f), join(dir, f));
-      }
+      if (authored(f)) copyFileSync(join(ROOT, "envs", root.from, f), join(dir, f));
     }
+    if (root.set === undefined) continue;
     const out = join(work, "emit", root.name);
     const args = [CLI, "emit", root.set, "--target", "flowascode", "--out", out];
     if (root.profile !== undefined) {
