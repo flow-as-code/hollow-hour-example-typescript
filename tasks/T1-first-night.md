@@ -111,12 +111,13 @@ the environment, never committed>` exits 0 for each; and scenario S2
         live reference after the physical resource (envs/README.md, Checking
         drift). `flow-cli diff seasonal/` exited 0. In its place,
         `npm run drift -- dev` and `npm run drift -- qa` each reported all 12
-        FlowDocs unchanged at 19:57 UTC, and after the prod apply
-        `npm run drift -- qa` and `npm run drift -- prod` each reported "No
-        drift." A dev run then failed with "Too Many Requests" (Connect
-        throttling) and a re-run reported "No drift."; the check now paces
-        its calls and retries throttling, and at 20:29 UTC it reported "No
-        drift." on dev in 7 s (envs/README.md, Checking drift). The criterion
+        FlowDocs unchanged at 19:57 UTC. Later on 2026-09-30 a dev run
+        failed with "Too Many Requests" (Connect throttling; its time was not
+        recorded), so the check now paces its calls and retries throttling.
+        The paced check reported "No drift." on dev at 20:29 UTC in 7 s, on
+        prod from 20:46:44 to 20:46:51 UTC and on qa from 20:46:51 to
+        20:46:58 UTC (envs/README.md, Checking drift). Runs made between the
+        prod apply and 20:29 were not timed and are not counted. The criterion
         stays open until the CLI can map references, or is amended to name
         the drift check.
   - [x] S2 passed as an operator run against dev with the stub Lambdas:
@@ -133,8 +134,10 @@ the environment, never committed>` exits 0 for each; and scenario S2
         a Tier 2 resource (refs/manifest.json), no scenario uses it, and the
         map was written.
   - [ ] S2 on qa: the instance quota reads 0.0 (dev and prod read 10.0,
-        rechecked at 20:30 UTC). An increase to 10 was requested and is an
-        open AWS Support case (envs/README.md, Bootstrap).
+        rechecked at 20:30 UTC and again at 20:46:59 to 20:47:02 UTC). An
+        increase to 10 was requested at 2026-09-30T20:12:35Z. At 20:46 UTC
+        Service Quotas listed it as `CASE_OPENED`, an open AWS Support case,
+        last updated at 20:15:43 UTC (envs/README.md, Bootstrap).
 
 ## Assumptions
 

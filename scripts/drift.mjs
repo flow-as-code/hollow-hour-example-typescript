@@ -40,8 +40,8 @@
 // operations (https://docs.aws.amazon.com/connect/latest/adminguide/amazon-connect-service-limits.html#connect-api-quotas).
 // On 2026-09-30 a dev run was refused with "Too Many Requests". So every
 // call goes through `pacedSender`: at most one request per PACE_MS, and a
-// throttling refusal (TooManyRequestsException, ThrottlingException, HTTP 429)
-// is retried with capped exponential backoff and full jitter, up to RETRIES
+// throttling refusal (TooManyRequestsException, ThrottlingException, HTTP 429,
+// or a message containing "too many requests" in any case) is retried with capped exponential backoff and full jitter, up to RETRIES
 // times, before the error is reported. The SDK's own retries stay as they are
 // underneath; this is the outer bound.
 //

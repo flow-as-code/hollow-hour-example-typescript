@@ -64,12 +64,14 @@ aws connect list-instances --region us-west-2
 
 A new instance can also come up with a "Concurrent active calls per
 instance" quota of 0, which the documentation gives as 10 by default. It is
-an instance-level quota, and a contact over it is refused; a
-`flow-cli simulate` test case counts. On 2026-09-30 the qa instance read 0.0
-while dev and prod read 10.0 (read again at 20:30 UTC), and S2 on qa failed to
-start with "Failed to start execution of test case due to limit reached."
-(VERIFY.md, S2). Read it for each instance, by the instance's ARN (from
-`aws connect describe-instance`, never committed), in the instance's Region:
+an instance-level quota, and a contact over it is refused. On 2026-09-30 the
+qa instance read 0.0 while dev and prod read 10.0 (read again at 20:30 and
+20:47 UTC), and S2 on qa failed to start with "Failed to start execution of
+test case due to limit reached." (VERIFY.md, S2). That the 0 quota caused it
+is inferred, not observed: the quotas page's "How contacts are counted" does
+not say whether a `flow-cli simulate` test case counts. Read it for each
+instance, by the instance's ARN (from `aws connect describe-instance`, never
+committed), in the instance's Region:
 
 ```sh
 aws service-quotas get-service-quota --service-code connect \
@@ -83,11 +85,18 @@ aws service-quotas request-service-quota-increase --service-code connect \
   --quota-code L-12AB7C57 --context-id <instance arn> --desired-value 10 \
   --region <region>
 aws service-quotas list-requested-service-quota-change-history-by-quota \
-  --service-code connect --quota-code L-12AB7C57 --region <region>
+  --service-code connect --quota-code L-12AB7C57 \
+  --quota-requested-at-level RESOURCE --region <region>
 ```
 
-The qa request went to AWS Support as a case (status `CASE_OPENED`) rather
-than being applied on the spot, so allow for a wait
+`L-12AB7C57` is a resource-level quota, and without
+`--quota-requested-at-level RESOURCE` the history comes back empty: on
+2026-09-30 at 20:46 UTC it listed nothing in us-east-1 or us-west-2, and with
+the flag us-east-1 listed the qa request.
+
+The qa request, made at 2026-09-30T20:12:35Z, went to AWS Support as a case
+rather than being applied on the spot: at 20:46 UTC it read `CASE_OPENED`,
+last updated at 20:15:43 UTC, so allow for a wait
 ([quotas](https://docs.aws.amazon.com/connect/latest/adminguide/amazon-connect-service-limits.html)).
 
 The first apply has no bucket to hold its state, so it runs on local state
@@ -311,9 +320,10 @@ instance and caller there: 2 requests per second, burst 5
 ([API throttling quotas](https://docs.aws.amazon.com/connect/latest/adminguide/amazon-connect-service-limits.html#connect-api-quotas)).
 On 2026-09-30 a dev run failed with "Too Many Requests". The check now
 spaces its calls 500 ms apart and retries a throttling refusal
-(`TooManyRequestsException`, `ThrottlingException` or HTTP 429) up to six
-times, with exponential backoff from 1 s capped at 20 s and full jitter,
-printing each retry; `tests/drift.test.ts` holds that against a stubbed
+(`TooManyRequestsException`, `ThrottlingException`, HTTP 429, or a message
+containing "too many requests" in any case) up to six times, with
+exponential backoff from 1 s capped at 20 s and full jitter, printing each
+retry; `tests/drift.test.ts` holds that against a stubbed
 client. At 20:29 UTC the same day the paced check ran on dev in 7 s and
 reported "No drift.".
 
