@@ -25,9 +25,10 @@ environment. For the same hotline written entirely in Terraform, see
 > [Tiers and status](#tiers-and-status).
 >
 > The deploy found that Amazon Connect refuses a Compare with no
-> `Transitions.NextAction`, which flow-as-code 0.2.0's typed Compare does not
-> write. The Compares here are generic blocks that carry it until the release
-> with the upstream fix ([VERIFY.md, row C1](VERIFY.md#the-table)).
+> `Transitions.NextAction`, which flow-as-code 0.2.0's typed Compare did not
+> write, so the Compares here were generic blocks that carried it. flow-as-code
+> 0.2.1 writes it, and since 2026-09-30 they are typed again, with the deployed
+> flows unchanged ([VERIFY.md, row C1](VERIFY.md#the-table)).
 
 ## The premise
 
