@@ -91,7 +91,8 @@ the environment, never committed>` exits 0 for each; and scenario S2
 - [x] 1 to 9 and 11: offline, held by `npm run check` (lint, types,
       `generate:check`, `lint:flows`, and `npm test`, which runs
       `tests/validate.test.ts` when OpenTofu is on PATH), green on
-      2026-09-30 with the Compare workaround in place (VERIFY.md, C1).
+      2026-09-30 with the Compare workaround in place (VERIFY.md, C1), and
+      again the same day on flow-as-code 0.2.1 with the workaround removed.
 - [ ] 10, in part:
   - [x] `envs/bootstrap` applied: dev (us-west-2), qa and prod (us-east-1)
         instances and the state bucket. qa was refused on the first apply with
@@ -251,11 +252,14 @@ Where the build departs from the scope above, and why.
   with `use_lockfile=true`, to every `-backend-config` and to
   `TF_VAR_seasonal_state`. The bootstrap root's own state starts local and is
   migrated into the bucket it creates.
-- **The Compares are generic blocks for now.** Connect refused every typed
-  Compare the first dev apply sent, because flow-as-code 0.2.0 writes no
+- **The Compares were generic blocks until 0.2.1.** Connect refused every
+  typed Compare the first dev apply sent, because flow-as-code 0.2.0 writes no
   `Transitions.NextAction` for it (VERIFY C1). `check-moved` in
   `generators/flows.ts` and `check-caller` and `check-grade` in
-  `hh-hotline-main` are GenericBlock Compares whose `next` is their
-  NoMatchingCondition target. The fix belongs upstream in flow-as-code and is
-  not yet released; remove the workaround after upgrading to the release
-  whose changelog records that Compare writes NextAction.
+  `hh-hotline-main` became GenericBlock Compares whose `next` is their
+  NoMatchingCondition target. flow-as-code 0.2.1, whose changelog records
+  that Compare writes NextAction, removed the need: on 2026-09-30 the pins
+  moved to 0.2.1 and the three are typed `Compare` blocks again. The FlowDocs'
+  Actions did not change (only `meta.sourceHash`, and the hotline's
+  `meta.generator` stamp), and `tofu plan` reported no changes for dev, qa and
+  prod and their seasonal roots.
