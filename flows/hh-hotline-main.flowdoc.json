@@ -1099,11 +1099,29 @@
           "TargetContact": "Current"
         },
         "Transitions": {
-          "NextAction": "share-advice",
+          "NextAction": "open-work-order",
           "Errors": [
             {
               "ErrorType": "NoMatchingError",
               "NextAction": "note-ungraded"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "open-work-order",
+        "Type": "UpdateContactData",
+        "Parameters": {
+          "Description": "$.Attributes.advice",
+          "Name": "Hollow Hour work order"
+        },
+        "Transitions": {
+          "NextAction": "share-advice",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "share-advice"
             }
           ],
           "Conditions": []
@@ -1603,7 +1621,7 @@
   },
   "layout": {
     "apologize": {
-      "x": 13800,
+      "x": 14060,
       "y": 120
     },
     "ask-anyone-hurt": {
@@ -1639,7 +1657,7 @@
       "y": 20
     },
     "check-grade": {
-      "x": 9380,
+      "x": 9640,
       "y": 20
     },
     "check-injured-first": {
@@ -1675,11 +1693,11 @@
       "y": 120
     },
     "hand-to-dispatch": {
-      "x": 11720,
+      "x": 11980,
       "y": 20
     },
     "hang-up": {
-      "x": 14060,
+      "x": 14320,
       "y": 20
     },
     "kind-check": {
@@ -1687,7 +1705,7 @@
       "y": 20
     },
     "lines-busy": {
-      "x": 13800,
+      "x": 14060,
       "y": 20
     },
     "look-up-caller": {
@@ -1703,7 +1721,7 @@
       "y": 20
     },
     "note-dispatch": {
-      "x": 11980,
+      "x": 12240,
       "y": 20
     },
     "note-injury": {
@@ -1711,7 +1729,7 @@
       "y": 120
     },
     "note-lantern": {
-      "x": 9900,
+      "x": 10160,
       "y": 20
     },
     "note-moves-objects": {
@@ -1736,6 +1754,10 @@
     },
     "offer-end-or-continue": {
       "x": 3140,
+      "y": 20
+    },
+    "open-work-order": {
+      "x": 9120,
       "y": 20
     },
     "plane-check": {
@@ -1767,47 +1789,47 @@
       "y": 20
     },
     "send-to-lantern-crew": {
-      "x": 9640,
+      "x": 9900,
       "y": 120
     },
     "set-dispatch-agent-hold": {
-      "x": 13020,
-      "y": 20
-    },
-    "set-dispatch-agent-whisper": {
-      "x": 12500,
-      "y": 20
-    },
-    "set-dispatch-customer-hold": {
-      "x": 12760,
-      "y": 20
-    },
-    "set-dispatch-customer-whisper": {
-      "x": 12240,
-      "y": 20
-    },
-    "set-dispatch-queue": {
       "x": 13280,
       "y": 20
     },
+    "set-dispatch-agent-whisper": {
+      "x": 12760,
+      "y": 20
+    },
+    "set-dispatch-customer-hold": {
+      "x": 13020,
+      "y": 20
+    },
+    "set-dispatch-customer-whisper": {
+      "x": 12500,
+      "y": 20
+    },
+    "set-dispatch-queue": {
+      "x": 13540,
+      "y": 20
+    },
     "set-lantern-agent-hold": {
-      "x": 10940,
+      "x": 11200,
       "y": 20
     },
     "set-lantern-agent-whisper": {
-      "x": 10420,
-      "y": 20
-    },
-    "set-lantern-customer-hold": {
       "x": 10680,
       "y": 20
     },
+    "set-lantern-customer-hold": {
+      "x": 10940,
+      "y": 20
+    },
     "set-lantern-customer-whisper": {
-      "x": 10160,
+      "x": 10420,
       "y": 20
     },
     "set-lantern-queue": {
-      "x": 11200,
+      "x": 11460,
       "y": 20
     },
     "set-voice": {
@@ -1815,7 +1837,7 @@
       "y": 20
     },
     "share-advice": {
-      "x": 9120,
+      "x": 9380,
       "y": 20
     },
     "start-interview": {
@@ -1839,15 +1861,15 @@
       "y": 220
     },
     "to-district-menu": {
-      "x": 9640,
+      "x": 9900,
       "y": 20
     },
     "transfer-to-dispatch": {
-      "x": 13540,
+      "x": 13800,
       "y": 20
     },
     "transfer-to-lantern": {
-      "x": 11460,
+      "x": 11720,
       "y": 20
     },
     "untag-screen": {
@@ -1929,7 +1951,7 @@
   ],
   "meta": {
     "generator": "cli@0.2.1",
-    "sourceHash": "sha256:bc68f48874bf09c40ca95d2ebcf37d7393556be769a9636f77516a5639ee9727",
+    "sourceHash": "sha256:b1ace7239d75cff561b73a664dd95a33fc81f053ed09918969810698e9543791",
     "sourceKind": "ts"
   }
 }

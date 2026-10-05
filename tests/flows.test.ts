@@ -682,6 +682,89 @@ describe("the prank screen in hh-hotline-main", () => {
   });
 });
 
+/**
+ * The work order's shape (VERIFY D1): one UpdateContactData in the hotline,
+ * reached only once the grade and advice are recorded and passed through on
+ * every way to the spoken advice, with a static Name a crew can search for,
+ * the Description read from the advice, and the catch-all wired so a refused
+ * update never costs the caller the advice.
+ */
+function workOrderProblems(d: FlowDoc): string[] {
+  const out: string[] = [];
+  const orders = d.content.Actions.filter((a) => a.Type === "UpdateContactData");
+  if (orders.length !== 1) {
+    out.push(`${String(orders.length)} UpdateContactData blocks, expected exactly one`);
+  }
+  const order = orders[0];
+  if (order === undefined) return out;
+  const name = String(order.Parameters.Name);
+  if (name !== "Hollow Hour work order")
+    out.push(`Name is ${name}, not the static work-order name`);
+  if (order.Parameters.Description !== "$.Attributes.advice") {
+    out.push(`Description is ${String(order.Parameters.Description)}, not $.Attributes.advice`);
+  }
+  if (!(order.Transitions.Errors ?? []).some((e) => e.ErrorType === "NoMatchingError")) {
+    out.push("the catch-all is not wired");
+  }
+  if (!reachesWithout(d, d.content.StartAction, order.Identifier, "")) {
+    out.push("the work order is unreachable");
+  }
+  if (reachesWithout(d, d.content.StartAction, order.Identifier, "record-grade")) {
+    out.push("the work order is reachable before the grade is recorded");
+  }
+  if (reachesWithout(d, d.content.StartAction, "share-advice", order.Identifier)) {
+    out.push("the advice is shared without a work order");
+  }
+  return out;
+}
+
+describe("the work order in hh-hotline-main", () => {
+  const main = doc("hh-hotline-main");
+
+  it("opens one after the grade is recorded and before the advice, named statically, described by the advice", () => {
+    expect(workOrderProblems(main)).toEqual([]);
+    const order = action(main, "open-work-order");
+    expect(order.Type).toBe("UpdateContactData");
+    expect(order.Parameters).toEqual({
+      Name: "Hollow Hour work order",
+      Description: "$.Attributes.advice",
+    });
+    expect(action(main, "record-grade").Transitions.NextAction).toBe("open-work-order");
+    expect(order.Transitions.NextAction).toBe("share-advice");
+    expect((order.Transitions.Errors ?? []).map((e) => e.NextAction)).toEqual(["share-advice"]);
+  });
+
+  it("catches a dynamic name, a static description and a missing catch-all", () => {
+    const broken = structuredClone(main);
+    const order = action(broken, "open-work-order");
+    order.Parameters.Name = "$.Attributes.callerName";
+    order.Parameters.Description = "Put small breakables away.";
+    order.Transitions.Errors = [];
+    expect(workOrderProblems(broken)).toEqual([
+      "Name is $.Attributes.callerName, not the static work-order name",
+      "Description is Put small breakables away., not $.Attributes.advice",
+      "the catch-all is not wired",
+    ]);
+  });
+
+  it("catches a work order opened before the grade, or an advice path that skips it", () => {
+    const early = structuredClone(main);
+    action(early, "classify").Transitions.NextAction = "open-work-order";
+    action(early, "open-work-order").Transitions.NextAction = "record-grade";
+    action(early, "record-grade").Transitions.NextAction = "share-advice";
+    // Every path to the advice still passes the work order; it is just too early.
+    expect(workOrderProblems(early)).toEqual([
+      "the work order is reachable before the grade is recorded",
+    ]);
+    const skipped = structuredClone(main);
+    action(skipped, "record-grade").Transitions.NextAction = "share-advice";
+    expect(workOrderProblems(skipped)).toEqual([
+      "the work order is unreachable",
+      "the advice is shared without a work order",
+    ]);
+  });
+});
+
 /** The dead line's shape, as a list of what is wrong with it (VERIFY 16.4, 16.5, 16.3). */
 function deadLineProblems(d: FlowDoc): string[] {
   const out: string[] = [];

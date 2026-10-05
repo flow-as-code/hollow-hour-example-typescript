@@ -290,9 +290,9 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       five flow types and five reference types Tier 1 used, and tier 2's
       names CUSTOMER_HOLD and AGENT_HOLD (PR 2) and
       UpdateContactRecordingBehavior, UpdateContactRoutingBehavior and
-      UpdateContactCallbackNumber (PR 3) and UntagContact (PR 4). The other
-      three action types and the `prompt` reference type join it with the
-      PRs that land them.
+      UpdateContactCallbackNumber (PR 3), UntagContact (PR 4) and
+      UpdateContactData (PR 5). The other two action types and the `prompt`
+      reference type join it with the PRs that land them.
 - [ ] 4, in part: the generic-block policy test (PR 1, `tests/flows.test.ts`,
       "generic blocks"): every companion in `flows/` and `seasonal/` writes
       no `GenericBlock` for a type the catalog models, with the mutation case
@@ -321,7 +321,13 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       goes on to `classify` with the tag set because hanging up on a caller
       who pressed 1 is the worse outcome; the walk can follow that branch
       (`throughFailedUntag`) and the test names each leave it reaches, so
-      the exception is held rather than hidden (review).
+      the exception is held rather than hidden (review). PR 5 adds, with
+      its mutation cases: the hotline holds exactly one UpdateContactData,
+      `open-work-order`, reachable only through `record-grade` and on every
+      path to `share-advice`, with the static Name, the Description
+      `$.Attributes.advice` and the catch-all wired (mutations: a JSONPath
+      Name, a static Description, no catch-all, the block moved ahead of
+      the grade, the grade wired past it).
 - [ ] 5, in part: the new flows are under the banned-terms, phone-range and
       emergency-line checks like every other; PR 4 adds the kind ending of
       the prank path (`dare-goodbye` thanks the caller and invites them
@@ -334,7 +340,8 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       and `harness-checked YYYY-MM-DD: <result>` beside the two earlier
       shapes, each with positive and negative cases (PR 1). HC1 added with
       `hours:closed` (PR 3), `needs sandbox`; RS1 added for the recording
-      storage (below), `needs sandbox`.
+      storage (below), `needs sandbox`; D1 added with the work order (PR 5),
+      `needs sandbox`.
 - [ ] Recording storage (tier decision 5), checked 2026-10-05 at 17:25 UTC:
       `list-instance-storage-configs` for CALL_RECORDINGS returned `[]` on
       dev, qa and prod (all us-east-1), so `envs/bootstrap/recordings.tf`

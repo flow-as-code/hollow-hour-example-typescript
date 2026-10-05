@@ -68,6 +68,15 @@ tag untags it or ends the call, with one held exception: a failed
 `untag-screen` goes on with the tag set, because hanging up on a caller who
 pressed 1 is the worse outcome.
 
+Every graded call becomes a work order: `open-work-order` (UpdateContactData)
+runs after `record-grade` and before the advice is spoken, naming the contact
+"Hollow Hour work order" statically and taking its Description from
+`$.Attributes.advice`, so a crew finds the call in contact search by that name
+and reads the advice the caller was given (VERIFY.md, row D1). Its catch-all
+continues to `share-advice`: a refused update never costs the caller the
+advice. The dispatch fallback from a failed classification opens none, since
+there is no advice to record.
+
 ## What the flows read and write
 
 Lambda responses, read as `$.External.<key>`. Every invocation uses `JSON`
@@ -90,7 +99,7 @@ not):
 | ------------------------------ | --------------------------------------- | ------------------------------------ |
 | `season`                       | the greeting module                     | `hh-hotline-main` (the `season` tag) |
 | `callerName`, `callerStatus`   | `hh-hotline-main`                       | `hh-hotline-main` (welcome back)     |
-| `grade`, `gradeName`, `advice` | `hh-hotline-main` (from the classifier; `gradeName` is `Ungraded` on the dispatch fallback from a failed classification); `gradeName` is `Departed` from `hh-dead-line` | `hh-hotline-main`, `hh-agent-whisper`, `hh-agent-hold` |
+| `grade`, `gradeName`, `advice` | `hh-hotline-main` (from the classifier; `gradeName` is `Ungraded` on the dispatch fallback from a failed classification); `gradeName` is `Departed` from `hh-dead-line` | `hh-hotline-main` (the advice and the work order), `hh-agent-whisper`, `hh-agent-hold` |
 | `district`, `districtName`     | `hh-district-menu`; rewritten by `hh-district-<slug>` before an overflow, by `hh-queue-experience-<slug>` before a move, by `hh-hotline-main` for the Lantern Crew and dispatch, and by `hh-dead-line` (`beyond`, `Beyond`) | both whispers, `hh-customer-hold`, the queue flows' copy |
 | `moved`                        | `hh-queue-experience-<slug>` (`true` before a move, `false` if it fails) | `hh-queue-experience-<slug>` (skips the offer) |
 
