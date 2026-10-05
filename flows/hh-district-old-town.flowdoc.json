@@ -53,6 +53,44 @@
           }
         },
         "Transitions": {
+          "NextAction": "set-customer-hold",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-customer-hold"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-customer-hold",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "CustomerHold": "${cdref:flow:hh-customer-hold}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-agent-hold",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-agent-hold"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-agent-hold",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "AgentHold": "${cdref:flow:hh-agent-hold}"
+          }
+        },
+        "Transitions": {
           "NextAction": "set-queue-experience",
           "Errors": [
             {
@@ -416,6 +454,44 @@
           }
         },
         "Transitions": {
+          "NextAction": "set-dispatch-customer-hold",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-customer-hold"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-customer-hold",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "CustomerHold": "${cdref:flow:hh-customer-hold}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-dispatch-agent-hold",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-agent-hold"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-agent-hold",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "AgentHold": "${cdref:flow:hh-agent-hold}"
+          }
+        },
+        "Transitions": {
           "NextAction": "set-dispatch-queue",
           "Errors": [
             {
@@ -506,31 +582,31 @@
   },
   "layout": {
     "after-hours": {
-      "x": 1580,
-      "y": 20
-    },
-    "announce-line": {
       "x": 2100,
       "y": 20
     },
-    "apologize": {
-      "x": 3920,
-      "y": 120
-    },
-    "check-hours": {
-      "x": 1320,
-      "y": 20
-    },
-    "check-staffing": {
-      "x": 1580,
-      "y": 120
-    },
-    "crew-full": {
+    "announce-line": {
       "x": 2620,
       "y": 20
     },
-    "crew-ready": {
+    "apologize": {
+      "x": 4440,
+      "y": 120
+    },
+    "check-hours": {
       "x": 1840,
+      "y": 20
+    },
+    "check-staffing": {
+      "x": 2100,
+      "y": 120
+    },
+    "crew-full": {
+      "x": 3140,
+      "y": 20
+    },
+    "crew-ready": {
+      "x": 2360,
       "y": 120
     },
     "hand-to-dispatch": {
@@ -538,11 +614,11 @@
       "y": 120
     },
     "hang-up": {
-      "x": 4180,
+      "x": 4700,
       "y": 20
     },
     "lines-busy": {
-      "x": 3920,
+      "x": 4440,
       "y": 20
     },
     "note-dispatch": {
@@ -550,15 +626,19 @@
       "y": 120
     },
     "note-overflow-crew": {
-      "x": 1060,
+      "x": 1580,
       "y": 20
     },
     "note-overflow-district": {
-      "x": 2880,
+      "x": 3400,
       "y": 20
     },
     "read-queue": {
-      "x": 1840,
+      "x": 2360,
+      "y": 20
+    },
+    "set-agent-hold": {
+      "x": 1060,
       "y": 20
     },
     "set-agent-whisper": {
@@ -569,12 +649,24 @@
       "x": 20,
       "y": 20
     },
+    "set-customer-hold": {
+      "x": 800,
+      "y": 20
+    },
     "set-customer-whisper": {
       "x": 280,
       "y": 20
     },
+    "set-dispatch-agent-hold": {
+      "x": 1580,
+      "y": 120
+    },
     "set-dispatch-agent-whisper": {
       "x": 1060,
+      "y": 120
+    },
+    "set-dispatch-customer-hold": {
+      "x": 1320,
       "y": 120
     },
     "set-dispatch-customer-whisper": {
@@ -582,39 +674,49 @@
       "y": 120
     },
     "set-dispatch-queue": {
-      "x": 1320,
+      "x": 1840,
       "y": 120
     },
     "set-overflow-queue": {
-      "x": 3400,
+      "x": 3920,
       "y": 20
     },
     "set-overflow-queue-experience": {
-      "x": 3140,
+      "x": 3660,
       "y": 20
     },
     "set-queue-experience": {
-      "x": 800,
+      "x": 1320,
       "y": 20
     },
     "transfer-to-crew": {
-      "x": 2360,
+      "x": 2880,
       "y": 20
     },
     "transfer-to-dispatch": {
-      "x": 1580,
+      "x": 2100,
       "y": 220
     },
     "transfer-to-overflow": {
-      "x": 3660,
+      "x": 4180,
       "y": 20
     }
   },
   "refs": [
     {
+      "token": "${cdref:flow:hh-agent-hold}",
+      "type": "flow",
+      "name": "hh-agent-hold"
+    },
+    {
       "token": "${cdref:flow:hh-agent-whisper}",
       "type": "flow",
       "name": "hh-agent-whisper"
+    },
+    {
+      "token": "${cdref:flow:hh-customer-hold}",
+      "type": "flow",
+      "name": "hh-customer-hold"
     },
     {
       "token": "${cdref:flow:hh-customer-whisper}",
@@ -654,7 +756,7 @@
   ],
   "meta": {
     "generator": "hollow-hour-example generators/districts.ts",
-    "sourceHash": "sha256:19cafedf56c1dc00597c94a17ba291b0e8da87b5e99d5e0c1d010e22503615f9",
+    "sourceHash": "sha256:a20942425e78eb18812bca62a5fed1c33884b1ad53cb5eb17bdac3bfbe1b721f",
     "sourceKind": "ts"
   }
 }

@@ -242,6 +242,44 @@
           }
         },
         "Transitions": {
+          "NextAction": "set-dispatch-customer-hold",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-customer-hold"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-customer-hold",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "CustomerHold": "${cdref:flow:hh-customer-hold}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-dispatch-agent-hold",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-agent-hold"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-agent-hold",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "AgentHold": "${cdref:flow:hh-agent-hold}"
+          }
+        },
+        "Transitions": {
           "NextAction": "set-dispatch-queue",
           "Errors": [
             {
@@ -332,7 +370,7 @@
   },
   "layout": {
     "apologize": {
-      "x": 2360,
+      "x": 2880,
       "y": 120
     },
     "ask-district": {
@@ -344,11 +382,11 @@
       "y": 20
     },
     "hang-up": {
-      "x": 2620,
+      "x": 3140,
       "y": 20
     },
     "lines-busy": {
-      "x": 2360,
+      "x": 2880,
       "y": 20
     },
     "note-dispatch": {
@@ -367,8 +405,16 @@
       "x": 280,
       "y": 20
     },
+    "set-dispatch-agent-hold": {
+      "x": 2100,
+      "y": 20
+    },
     "set-dispatch-agent-whisper": {
       "x": 1580,
+      "y": 20
+    },
+    "set-dispatch-customer-hold": {
+      "x": 1840,
       "y": 20
     },
     "set-dispatch-customer-whisper": {
@@ -376,7 +422,7 @@
       "y": 20
     },
     "set-dispatch-queue": {
-      "x": 1840,
+      "x": 2360,
       "y": 20
     },
     "to-graveyard-hill": {
@@ -392,15 +438,25 @@
       "y": 20
     },
     "transfer-to-dispatch": {
-      "x": 2100,
+      "x": 2620,
       "y": 20
     }
   },
   "refs": [
     {
+      "token": "${cdref:flow:hh-agent-hold}",
+      "type": "flow",
+      "name": "hh-agent-hold"
+    },
+    {
       "token": "${cdref:flow:hh-agent-whisper}",
       "type": "flow",
       "name": "hh-agent-whisper"
+    },
+    {
+      "token": "${cdref:flow:hh-customer-hold}",
+      "type": "flow",
+      "name": "hh-customer-hold"
     },
     {
       "token": "${cdref:flow:hh-customer-whisper}",
@@ -430,7 +486,7 @@
   ],
   "meta": {
     "generator": "hollow-hour-example generators/districts.ts",
-    "sourceHash": "sha256:7d227123165320e6ac553356f936ddf20a0c2099b06d5d2c3d69d7ff84607b16",
+    "sourceHash": "sha256:40ffd8d15d477214b92a58142c1abca46cf8f141776de58bdb7d9ebb753045c1",
     "sourceKind": "ts"
   }
 }

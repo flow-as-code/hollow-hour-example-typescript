@@ -283,17 +283,31 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
 
 ## Where the criteria stand (2026-10-05)
 
+- [ ] 3, in part: `tests/coverage.test.ts` holds a per-tier floor
+      (`TIER_FLOOR`) with a mutation case; tier 1's floor is the 24 types,
+      five flow types and five reference types Tier 1 used, and tier 2's
+      names CUSTOMER_HOLD and AGENT_HOLD (PR 2). The seven action types and
+      the `prompt` reference type join it with the PRs that land them.
 - [ ] 4, in part: the generic-block policy test (PR 1, `tests/flows.test.ts`,
       "generic blocks"): every companion in `flows/` and `seasonal/` writes
       no `GenericBlock` for a type the catalog models, with the mutation case
       a GetParticipantInput carrying `StoreInput "True"`, which 0.2.1's
-      codegen can only write generically.
+      codegen can only write generically. PR 2 adds, each with its mutation
+      case: each hold flow is one MessageParticipantIteratively and nothing
+      else; wherever a CustomerWhisper hook is set, AgentWhisper,
+      CustomerHold and AgentHold are set in the same chain of hook blocks,
+      one hook per block; no Wait in any flow; and the key-use rule with its
+      dated `UNUSED_UNTIL` list (see Deviations). The Lantern Crew and
+      dispatch chains are held to four hooks and the generated district
+      flows to five.
 - [ ] 8, in part: S1 (`scenarios/s1-safety-path.scenario.json`), checked
       offline by `tests/envScenarios.test.ts`; not yet run live.
 - [ ] 9, in part: `tests/verify.test.ts` accepts `docs-checked YYYY-MM-DD`
       and `harness-checked YYYY-MM-DD: <result>` beside the two earlier
       shapes, each with positive and negative cases (PR 1). No row added yet.
-- [ ] 1 to 3, 5 to 7, 10: not started.
+- [ ] 1, 2, 6: held by `npm run check` and the emit tests at each PR; the
+      Terraform-first side of 1 waits on the mirror.
+- [ ] 5, 7, 10: not started.
 
 ## VERIFY rows this tier adds
 
@@ -408,4 +422,10 @@ awscc_connect_prompt.salt_line_tips.prompt_arn`) and `hh-district-menu.tf`.
 
 ## Deviations
 
-None yet.
+- **The key-use rule landed in PR 2, not PR 6** (2026-10-05). The plan put
+  the rewrite of "uses exactly the manifest's Tier 1 keys" with the
+  callbacks PR, but the first tier 2 key a flow uses (`flow:hh-customer-hold`
+  in PR 2) makes the Tier 1 form false, so PR 2 carries the rule as the
+  plan states it (tiers 1 and 2, scenario substitutes, the dated
+  `UNUSED_UNTIL` list naming each gate) and the list shrinks as PRs 3 to 8
+  land. `hours:the-dead` is never on the list: S2 names it as a substitute.

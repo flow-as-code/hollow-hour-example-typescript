@@ -6,9 +6,10 @@
 // showcase aims to use all of them by Tier 3; until then this reports what is
 // missing and does not fail on it. It fails on what should never happen: an
 // action type the catalog does not model (a GenericBlock) without an entry in
-// ALLOWED_GENERIC saying why.
+// ALLOWED_GENERIC saying why, or a type a landed tier used that a later
+// change dropped (TIER_FLOOR).
 
-import { collectRefs, modeledTypes } from "@flow-as-code/core";
+import { collectRefs, modeledTypes, type FlowDoc } from "@flow-as-code/core";
 import { describe, expect, it } from "vitest";
 import { loadAll } from "../generators/flowset.js";
 import { REF_TYPES } from "../generators/refs.js";
@@ -16,15 +17,89 @@ import { REF_TYPES } from "../generators/refs.js";
 /** Unmodeled types a flow may carry as a GenericBlock, each with its reason. Tier 1 has none. */
 const ALLOWED_GENERIC: Record<string, string> = {};
 
-const docs = loadAll().map((l) => l.doc);
-const usedTypes = new Map<string, Set<string>>();
-for (const d of docs) {
-  for (const a of d.content.Actions) {
-    usedTypes.set(a.Type, (usedTypes.get(a.Type) ?? new Set()).add(d.name));
-  }
+interface Floor {
+  actionTypes: string[];
+  flowTypes: string[];
+  refTypes: string[];
 }
+
+/**
+ * What the flows must use once a tier has landed, so a later change cannot
+ * quietly drop a type the showcase exists to show. Tier 2's floor fills in
+ * PR by PR (tasks/T2-full-moon.md, criterion 3) until it names
+ * CreateCallbackContact, DistributeByPercentage, UntagContact,
+ * UpdateContactCallbackNumber, UpdateContactData,
+ * UpdateContactRecordingBehavior and UpdateContactRoutingBehavior, the two
+ * hold flow types and the prompt reference type.
+ */
+const TIER_FLOOR: Record<string, Floor> = {
+  "1": {
+    actionTypes: [
+      "CheckHoursOfOperation",
+      "CheckMetricData",
+      "Compare",
+      "DequeueContactAndTransferToQueue",
+      "DisconnectParticipant",
+      "EndFlowExecution",
+      "EndFlowModuleExecution",
+      "GetMetricData",
+      "GetParticipantInput",
+      "InvokeFlowModule",
+      "InvokeLambdaFunction",
+      "Loop",
+      "MessageParticipant",
+      "MessageParticipantIteratively",
+      "TagContact",
+      "TransferContactToQueue",
+      "TransferToFlow",
+      "UpdateContactAttributes",
+      "UpdateContactEventHooks",
+      "UpdateContactRecordingAndAnalyticsBehavior",
+      "UpdateContactTargetQueue",
+      "UpdateContactTextToSpeechVoice",
+      "UpdateFlowAttributes",
+      "UpdateFlowLoggingBehavior",
+    ],
+    flowTypes: ["AGENT_WHISPER", "CONTACT_FLOW", "CUSTOMER_QUEUE", "CUSTOMER_WHISPER", "MODULE"],
+    refTypes: ["flow", "hours", "lambda", "module", "queue"],
+  },
+  // T2 PR 2: the hold flows.
+  "2": {
+    actionTypes: [],
+    flowTypes: ["AGENT_HOLD", "CUSTOMER_HOLD"],
+    refTypes: [],
+  },
+};
+
+type Doc = Pick<FlowDoc, "name" | "connectType" | "content">;
+
+function usage(docs: Doc[]) {
+  const actionTypes = new Map<string, Set<string>>();
+  for (const d of docs) {
+    for (const a of d.content.Actions) {
+      actionTypes.set(a.Type, (actionTypes.get(a.Type) ?? new Set()).add(d.name));
+    }
+  }
+  return {
+    actionTypes,
+    flowTypes: new Set<string>(docs.map((d) => d.connectType)),
+    refTypes: new Set<string>(docs.flatMap((d) => collectRefs(d.content).map((r) => r.type))),
+  };
+}
+
+/** What a floor asks for that these documents do not use. */
+function floorProblems(docs: Doc[], floor: Floor): string[] {
+  const used = usage(docs);
+  return [
+    ...floor.actionTypes.filter((t) => !used.actionTypes.has(t)).map((t) => `action type ${t}`),
+    ...floor.flowTypes.filter((t) => !used.flowTypes.has(t)).map((t) => `flow type ${t}`),
+    ...floor.refTypes.filter((t) => !used.refTypes.has(t)).map((t) => `reference type ${t}`),
+  ];
+}
+
+const docs = loadAll().map((l) => l.doc);
+const { actionTypes: usedTypes, refTypes: usedRefTypes } = usage(docs);
 const modeled = modeledTypes().sort();
-const usedRefTypes = new Set(docs.flatMap((d) => collectRefs(d.content).map((r) => r.type)));
 
 describe("coverage", () => {
   it("reports the modeled action types used and missing", () => {
@@ -46,6 +121,36 @@ describe("coverage", () => {
       (t) => !modeled.includes(t) && !(t in ALLOWED_GENERIC),
     );
     expect(generic).toEqual([]);
+  });
+
+  it("catches a dropped flow type or action type, so the floors mean something", () => {
+    const withoutHolds = docs.filter((d) => !/_HOLD$/.test(d.connectType));
+    expect(
+      floorProblems(
+        withoutHolds,
+        TIER_FLOOR["2"] ?? { actionTypes: [], flowTypes: [], refTypes: [] },
+      ),
+    ).toEqual(["flow type AGENT_HOLD", "flow type CUSTOMER_HOLD"]);
+    const withoutLoops = docs.map((d) => ({
+      ...d,
+      content: { ...d.content, Actions: d.content.Actions.filter((a) => a.Type !== "Loop") },
+    }));
+    expect(
+      floorProblems(
+        withoutLoops,
+        TIER_FLOOR["1"] ?? { actionTypes: [], flowTypes: [], refTypes: [] },
+      ),
+    ).toEqual(["action type Loop"]);
+  });
+
+  it.each(Object.entries(TIER_FLOOR))("meets the tier %s floor", (_tier, floor) => {
+    expect(floorProblems(docs, floor)).toEqual([]);
+  });
+
+  it("names only modeled action types in the floors", () => {
+    for (const floor of Object.values(TIER_FLOOR)) {
+      expect(floor.actionTypes.filter((t) => !modeled.includes(t))).toEqual([]);
+    }
   });
 
   it("uses only the eight reference types the catalog defines", () => {

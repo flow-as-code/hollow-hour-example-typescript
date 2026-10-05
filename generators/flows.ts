@@ -15,6 +15,10 @@
 // - Whisper copy reads contact attributes, which hh-hotline-main sets; flow
 //   attributes do not reach whispers (16.6). UpdateFlowAttributes here holds
 //   one flow-local value, the overflow crew's name, read later in this flow.
+// - The hold hooks travel with the whisper hooks (one hook per block, 16.3):
+//   wherever a path can reach an agent, CustomerHold and AgentHold are set in
+//   the same chain, so no path gets Connect's default hold (decided
+//   2026-10-05, tasks/T2-full-moon.md).
 // - hh-queue-experience-<slug> is one flow per district because its sibling
 //   queue is a static reference (synthesis section 2, item 2). It uses no
 //   Wait (chat only, 16.1), no module and no target-queue update (both illegal
@@ -103,6 +107,20 @@ export function districtFlow(d: District, districts: readonly District[]): Flow 
       id: "set-agent-whisper",
       hook: "AgentWhisper",
       flow: Refs.flow("hh-agent-whisper"),
+      next: "set-customer-hold",
+      onError: "set-customer-hold",
+    }),
+    new UpdateContactEventHooks({
+      id: "set-customer-hold",
+      hook: "CustomerHold",
+      flow: Refs.flow("hh-customer-hold"),
+      next: "set-agent-hold",
+      onError: "set-agent-hold",
+    }),
+    new UpdateContactEventHooks({
+      id: "set-agent-hold",
+      hook: "AgentHold",
+      flow: Refs.flow("hh-agent-hold"),
       next: "set-queue-experience",
       onError: "set-queue-experience",
     }),
@@ -318,7 +336,7 @@ export function queueExperienceFlow(d: District, districts: readonly District[])
   );
 }
 
-/** The dispatch fallback both generated contact flows end on, with its whispers set. */
+/** The dispatch fallback both generated contact flows end on, with its whispers and holds set. */
 function dispatchBlocks() {
   return [
     new MessageParticipant({
@@ -344,6 +362,20 @@ function dispatchBlocks() {
       id: "set-dispatch-agent-whisper",
       hook: "AgentWhisper",
       flow: Refs.flow("hh-agent-whisper"),
+      next: "set-dispatch-customer-hold",
+      onError: "set-dispatch-customer-hold",
+    }),
+    new UpdateContactEventHooks({
+      id: "set-dispatch-customer-hold",
+      hook: "CustomerHold",
+      flow: Refs.flow("hh-customer-hold"),
+      next: "set-dispatch-agent-hold",
+      onError: "set-dispatch-agent-hold",
+    }),
+    new UpdateContactEventHooks({
+      id: "set-dispatch-agent-hold",
+      hook: "AgentHold",
+      flow: Refs.flow("hh-agent-hold"),
       next: "set-dispatch-queue",
       onError: "set-dispatch-queue",
     }),
