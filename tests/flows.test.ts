@@ -160,7 +160,6 @@ describe("names and references", () => {
       gate: "T2 PR 6, S4 substitutes it for a district's hours",
       since: "2026-10-05",
     },
-    "lambda:prank-score": { gate: "T2 PR 4, the prank screen", since: "2026-10-05" },
     "module:hh-offer-callback": { gate: "T2 PR 6, callbacks", since: "2026-10-05" },
     "prompt:salt-line-tips": {
       gate: "T2 PR 7, the prompt and the A/B split",
@@ -377,7 +376,7 @@ describe("hh-hotline-main", () => {
   });
 
   it("invokes its Lambdas with JSON response validation (VERIFY L1)", () => {
-    for (const id of ["look-up-caller", "plane-check", "classify"]) {
+    for (const id of ["look-up-caller", "plane-check", "prank-score", "classify"]) {
       expect(action(main, id).Parameters.ResponseValidation).toEqual({ ResponseType: "JSON" });
     }
   });
@@ -457,6 +456,193 @@ describe("the plane check in hh-hotline-main", () => {
     // And the dead line is reachable at all.
     expect(reachesWithout(main, main.content.StartAction, "to-dead-line", "")).toBe(true);
   });
+});
+
+/**
+ * Whether `target` is reachable from `from` when the flow attributes are
+ * tracked: UpdateFlowAttributes sets them, and a Compare on
+ * `$.FlowAttributes.<name>` whose value is known follows only the branch that
+ * matches (else its no-match path). Anything else follows every transition.
+ */
+function reachesTracking(
+  d: FlowDoc,
+  from: string,
+  target: string,
+  attrs: Record<string, string> = {},
+): boolean {
+  const byId = new Map(d.content.Actions.map((a) => [a.Identifier, a]));
+  const seen = new Set<string>();
+  const queue: [string, Record<string, string>][] = [[from, attrs]];
+  while (queue.length > 0) {
+    const [id, state] = queue.shift() ?? ["", {}];
+    if (id === target) return true;
+    const key = `${id}|${JSON.stringify(state)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const a = byId.get(id);
+    if (a === undefined) continue;
+    const t = a.Transitions;
+    let next = state;
+    if (a.Type === "UpdateFlowAttributes") {
+      const set = a.Parameters.FlowAttributes as Record<string, { Value: string }>;
+      next = { ...state, ...Object.fromEntries(Object.entries(set).map(([k, v]) => [k, v.Value])) };
+    }
+    const compared = /^\$\.FlowAttributes\.([A-Za-z]+)$/.exec(
+      String(a.Parameters.ComparisonValue),
+    )?.[1];
+    if (a.Type === "Compare" && compared !== undefined && compared in state) {
+      const hit = (t.Conditions ?? []).find(
+        (c) => c.Condition.Operator === "Equals" && c.Condition.Operands[0] === state[compared],
+      );
+      queue.push([hit?.NextAction ?? t.NextAction ?? "", next]);
+      continue;
+    }
+    for (const to of [
+      t.NextAction,
+      ...(t.Conditions ?? []).map((c) => c.NextAction),
+      ...(t.Errors ?? []).map((e) => e.NextAction),
+    ]) {
+      if (to !== undefined) queue.push([to, next]);
+    }
+  }
+  return false;
+}
+
+/**
+ * From a TagContact that sets `tagKey`, every path must reach an UntagContact
+ * of that key or a DisconnectParticipant before it leaves the flow (a
+ * transfer, a module, an end), so the tag never travels on a wrong guess.
+ */
+function tagPathProblems(d: FlowDoc, tagKey: string): string[] {
+  const byId = new Map(d.content.Actions.map((a) => [a.Identifier, a]));
+  const leaves = new Set([
+    "TransferToFlow",
+    "TransferContactToQueue",
+    "InvokeFlowModule",
+    "EndFlowExecution",
+    "DequeueContactAndTransferToQueue",
+  ]);
+  const out: string[] = [];
+  const tags = d.content.Actions.filter(
+    (a) => a.Type === "TagContact" && tagKey in (a.Parameters.Tags as Record<string, string>),
+  );
+  for (const tag of tags) {
+    const seen = new Set<string>();
+    const queue = [
+      tag.Transitions.NextAction,
+      ...(tag.Transitions.Errors ?? []).map((e) => e.NextAction),
+    ];
+    while (queue.length > 0) {
+      const id = queue.shift();
+      if (id === undefined || seen.has(id)) continue;
+      seen.add(id);
+      const a = byId.get(id);
+      if (a === undefined) continue;
+      if (a.Type === "UntagContact" && (a.Parameters.TagKeys as string[]).includes(tagKey))
+        continue;
+      if (a.Type === "DisconnectParticipant") continue;
+      if (leaves.has(a.Type)) {
+        out.push(
+          `${d.name}#${tag.Identifier}: ${tagKey} reaches ${a.Identifier} (${a.Type}) still set`,
+        );
+        continue;
+      }
+      const t = a.Transitions;
+      queue.push(
+        t.NextAction,
+        ...(t.Conditions ?? []).map((c) => c.NextAction),
+        ...(t.Errors ?? []).map((e) => e.NextAction),
+      );
+    }
+  }
+  return out;
+}
+
+describe("the prank screen in hh-hotline-main", () => {
+  const main = doc("hh-hotline-main");
+
+  it("runs after the last question, scores with the answers and the number, and tags a high verdict", () => {
+    const last = action(main, "ask-multiple");
+    expect(
+      last.Transitions.Conditions?.find((c) => c.Condition.Operands[0] === "2")?.NextAction,
+    ).toBe("check-injured-first");
+    expect(action(main, "note-multiple").Transitions.NextAction).toBe("check-injured-first");
+    const injured = action(main, "check-injured-first");
+    expect(injured.Parameters.ComparisonValue).toBe("$.FlowAttributes.injured");
+    expect(injured.Transitions.Conditions).toEqual([
+      { NextAction: "classify", Condition: { Operator: "Equals", Operands: ["yes"] } },
+    ]);
+    expect(injured.Transitions.NextAction).toBe("prank-score");
+    const score = action(main, "prank-score");
+    expect(score.Parameters.LambdaFunctionARN).toBe("${cdref:lambda:prank-score}");
+    expect(Object.keys(score.Parameters.LambdaInvocationAttributes as object).sort()).toEqual([
+      "callerNumber",
+      "canSee",
+      "coldSpot",
+      "movesObjects",
+      "multiple",
+      "sounds",
+      "touchedYou",
+    ]);
+    const verdict = action(main, "check-verdict");
+    expect(verdict.Transitions.Conditions).toEqual([
+      { NextAction: "tag-screen", Condition: { Operator: "Equals", Operands: ["high"] } },
+    ]);
+    expect(verdict.Transitions.NextAction).toBe("classify");
+    expect(action(main, "tag-screen").Parameters.Tags).toEqual({ screen: "prank-suspected" });
+    expect(action(main, "tag-screen").Transitions.NextAction).toBe("kind-check");
+  });
+
+  it("clears the tag on 1 and classifies; says goodnight kindly on 2, a timeout or an error", () => {
+    const ask = action(main, "kind-check");
+    expect(
+      (ask.Transitions.Conditions ?? []).map((c) => [c.Condition.Operands[0], c.NextAction]),
+    ).toEqual([
+      ["1", "untag-screen"],
+      ["2", "dare-goodbye"],
+    ]);
+    expect(ask.Transitions.NextAction).toBe("dare-goodbye");
+    for (const e of ask.Transitions.Errors ?? []) expect(e.NextAction).toBe("dare-goodbye");
+    const untag = action(main, "untag-screen");
+    expect(untag.Type).toBe("UntagContact");
+    expect(untag.Parameters.TagKeys).toEqual(["screen"]);
+    expect(untag.Transitions.NextAction).toBe("classify");
+    expect(action(main, "dare-goodbye").Transitions.NextAction).toBe("hang-up");
+    expect(action(main, "hang-up").Type).toBe("DisconnectParticipant");
+  });
+
+  it("would notice an injured caller reaching the screen, so the walk means something", () => {
+    const broken = structuredClone(main);
+    const injured = action(broken, "check-injured-first");
+    if (injured.Transitions.Conditions?.[0])
+      injured.Transitions.Conditions[0].NextAction = "prank-score";
+    expect(reachesTracking(broken, "emergency-advice", "prank-score")).toBe(true);
+    // Untracked, the walk would reach it through the no-match branch and prove nothing.
+    expect(reachesWithout(main, "emergency-advice", "prank-score", "")).toBe(true);
+  });
+
+  it("never screens a caller who said someone is hurt: no path from the yes reaches prank-score", () => {
+    expect(reachesTracking(main, "emergency-advice", "prank-score")).toBe(false);
+    expect(reachesTracking(main, "start-interview", "prank-score")).toBe(true);
+  });
+
+  it("would notice the tag leaving the flow, so the tag walk means something", () => {
+    const broken = structuredClone(main);
+    const ask = action(broken, "kind-check");
+    if (ask.Transitions.Conditions?.[0]) ask.Transitions.Conditions[0].NextAction = "classify";
+    expect(tagPathProblems(broken, "screen").sort()).toEqual([
+      "hh-hotline-main#tag-screen: screen reaches to-district-menu (TransferToFlow) still set",
+      "hh-hotline-main#tag-screen: screen reaches transfer-to-dispatch (TransferContactToQueue) still set",
+      "hh-hotline-main#tag-screen: screen reaches transfer-to-lantern (TransferContactToQueue) still set",
+    ]);
+  });
+
+  it.each(flows.map((l) => l.doc.name))(
+    "%s: every path through a screen tag untags it or ends the call",
+    (name) => {
+      expect(tagPathProblems(doc(name), "screen")).toEqual([]);
+    },
+  );
 });
 
 /** The dead line's shape, as a list of what is wrong with it (VERIFY 16.4, 16.5, 16.3). */

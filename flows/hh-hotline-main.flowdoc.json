@@ -812,19 +812,19 @@
           "Text": "Last one. Could there be more than one of them? Press 1 for yes, 2 for no."
         },
         "Transitions": {
-          "NextAction": "classify",
+          "NextAction": "check-injured-first",
           "Errors": [
             {
               "ErrorType": "InputTimeLimitExceeded",
-              "NextAction": "classify"
+              "NextAction": "check-injured-first"
             },
             {
               "ErrorType": "NoMatchingCondition",
-              "NextAction": "classify"
+              "NextAction": "check-injured-first"
             },
             {
               "ErrorType": "NoMatchingError",
-              "NextAction": "classify"
+              "NextAction": "check-injured-first"
             }
           ],
           "Conditions": [
@@ -838,7 +838,7 @@
               }
             },
             {
-              "NextAction": "classify",
+              "NextAction": "check-injured-first",
               "Condition": {
                 "Operator": "Equals",
                 "Operands": [
@@ -860,11 +860,197 @@
           }
         },
         "Transitions": {
+          "NextAction": "check-injured-first",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "check-injured-first"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "check-injured-first",
+        "Type": "Compare",
+        "Parameters": {
+          "ComparisonValue": "$.FlowAttributes.injured"
+        },
+        "Transitions": {
+          "NextAction": "prank-score",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "prank-score"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "classify",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "yes"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "prank-score",
+        "Type": "InvokeLambdaFunction",
+        "Parameters": {
+          "InvocationTimeLimitSeconds": 4,
+          "InvocationType": "SYNCHRONOUS",
+          "LambdaFunctionARN": "${cdref:lambda:prank-score}",
+          "LambdaInvocationAttributes": {
+            "callerNumber": "$.CustomerEndpoint.Address",
+            "canSee": "$.FlowAttributes.canSee",
+            "coldSpot": "$.FlowAttributes.coldSpot",
+            "movesObjects": "$.FlowAttributes.movesObjects",
+            "multiple": "$.FlowAttributes.multiple",
+            "sounds": "$.FlowAttributes.sounds",
+            "touchedYou": "$.FlowAttributes.touched"
+          },
+          "ResponseValidation": {
+            "ResponseType": "JSON"
+          }
+        },
+        "Transitions": {
+          "NextAction": "check-verdict",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "classify"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "check-verdict",
+        "Type": "Compare",
+        "Parameters": {
+          "ComparisonValue": "$.External.verdict"
+        },
+        "Transitions": {
+          "NextAction": "classify",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "classify"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "tag-screen",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "high"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "tag-screen",
+        "Type": "TagContact",
+        "Parameters": {
+          "Tags": {
+            "screen": "prank-suspected"
+          }
+        },
+        "Transitions": {
+          "NextAction": "kind-check",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "kind-check"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "kind-check",
+        "Type": "GetParticipantInput",
+        "Parameters": {
+          "InputTimeLimitSeconds": "8",
+          "StoreInput": "False",
+          "Text": "Some calls are dares, and that is all right. If this is really happening, press 1. Otherwise, press 2."
+        },
+        "Transitions": {
+          "NextAction": "dare-goodbye",
+          "Errors": [
+            {
+              "ErrorType": "InputTimeLimitExceeded",
+              "NextAction": "dare-goodbye"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "dare-goodbye"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "dare-goodbye"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "untag-screen",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "NextAction": "dare-goodbye",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "2"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "untag-screen",
+        "Type": "UntagContact",
+        "Parameters": {
+          "TagKeys": [
+            "screen"
+          ]
+        },
+        "Transitions": {
           "NextAction": "classify",
           "Errors": [
             {
               "ErrorType": "NoMatchingError",
               "NextAction": "classify"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "dare-goodbye",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Thanks for keeping us on our toes. Call back any time something goes bump."
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hang-up"
             }
           ],
           "Conditions": []
@@ -1417,7 +1603,7 @@
   },
   "layout": {
     "apologize": {
-      "x": 12240,
+      "x": 13800,
       "y": 120
     },
     "ask-anyone-hurt": {
@@ -1453,15 +1639,27 @@
       "y": 20
     },
     "check-grade": {
-      "x": 7820,
+      "x": 9380,
+      "y": 20
+    },
+    "check-injured-first": {
+      "x": 7040,
       "y": 20
     },
     "check-plane": {
       "x": 3140,
       "y": 120
     },
+    "check-verdict": {
+      "x": 7560,
+      "y": 20
+    },
     "classify": {
-      "x": 7040,
+      "x": 8600,
+      "y": 20
+    },
+    "dare-goodbye": {
+      "x": 8340,
       "y": 20
     },
     "emergency-advice": {
@@ -1477,15 +1675,19 @@
       "y": 120
     },
     "hand-to-dispatch": {
-      "x": 10160,
+      "x": 11720,
       "y": 20
     },
     "hang-up": {
-      "x": 12500,
+      "x": 14060,
+      "y": 20
+    },
+    "kind-check": {
+      "x": 8080,
       "y": 20
     },
     "lines-busy": {
-      "x": 12240,
+      "x": 13800,
       "y": 20
     },
     "look-up-caller": {
@@ -1501,7 +1703,7 @@
       "y": 20
     },
     "note-dispatch": {
-      "x": 10420,
+      "x": 11980,
       "y": 20
     },
     "note-injury": {
@@ -1509,7 +1711,7 @@
       "y": 120
     },
     "note-lantern": {
-      "x": 8340,
+      "x": 9900,
       "y": 20
     },
     "note-moves-objects": {
@@ -1529,7 +1731,7 @@
       "y": 20
     },
     "note-ungraded": {
-      "x": 7560,
+      "x": 9120,
       "y": 120
     },
     "offer-end-or-continue": {
@@ -1544,8 +1746,12 @@
       "x": 1060,
       "y": 20
     },
-    "record-grade": {
+    "prank-score": {
       "x": 7300,
+      "y": 20
+    },
+    "record-grade": {
+      "x": 8860,
       "y": 20
     },
     "recording-notice": {
@@ -1561,47 +1767,47 @@
       "y": 20
     },
     "send-to-lantern-crew": {
-      "x": 8080,
+      "x": 9640,
       "y": 120
     },
     "set-dispatch-agent-hold": {
-      "x": 11460,
+      "x": 13020,
       "y": 20
     },
     "set-dispatch-agent-whisper": {
-      "x": 10940,
+      "x": 12500,
       "y": 20
     },
     "set-dispatch-customer-hold": {
-      "x": 11200,
+      "x": 12760,
       "y": 20
     },
     "set-dispatch-customer-whisper": {
-      "x": 10680,
+      "x": 12240,
       "y": 20
     },
     "set-dispatch-queue": {
-      "x": 11720,
+      "x": 13280,
       "y": 20
     },
     "set-lantern-agent-hold": {
-      "x": 9380,
+      "x": 10940,
       "y": 20
     },
     "set-lantern-agent-whisper": {
-      "x": 8860,
+      "x": 10420,
       "y": 20
     },
     "set-lantern-customer-hold": {
-      "x": 9120,
+      "x": 10680,
       "y": 20
     },
     "set-lantern-customer-whisper": {
-      "x": 8600,
+      "x": 10160,
       "y": 20
     },
     "set-lantern-queue": {
-      "x": 9640,
+      "x": 11200,
       "y": 20
     },
     "set-voice": {
@@ -1609,7 +1815,7 @@
       "y": 20
     },
     "share-advice": {
-      "x": 7560,
+      "x": 9120,
       "y": 20
     },
     "start-interview": {
@@ -1618,6 +1824,10 @@
     },
     "start-recording": {
       "x": 800,
+      "y": 20
+    },
+    "tag-screen": {
+      "x": 7820,
       "y": 20
     },
     "tag-season": {
@@ -1629,16 +1839,20 @@
       "y": 220
     },
     "to-district-menu": {
-      "x": 8080,
+      "x": 9640,
       "y": 20
     },
     "transfer-to-dispatch": {
-      "x": 11980,
+      "x": 13540,
       "y": 20
     },
     "transfer-to-lantern": {
-      "x": 9900,
+      "x": 11460,
       "y": 20
+    },
+    "untag-screen": {
+      "x": 8340,
+      "y": 120
     },
     "welcome-back": {
       "x": 2360,
@@ -1692,6 +1906,11 @@
       "name": "plane-check"
     },
     {
+      "token": "${cdref:lambda:prank-score}",
+      "type": "lambda",
+      "name": "prank-score"
+    },
+    {
       "token": "${cdref:module:greeting@live}",
       "type": "module",
       "name": "greeting",
@@ -1710,7 +1929,7 @@
   ],
   "meta": {
     "generator": "cli@0.2.1",
-    "sourceHash": "sha256:0e0cf401f5ae98a46ebeae5167bb3eb79973d48eaf619de18bfcdee78a63c4df",
+    "sourceHash": "sha256:bc68f48874bf09c40ca95d2ebcf37d7393556be769a9636f77516a5639ee9727",
     "sourceKind": "ts"
   }
 }

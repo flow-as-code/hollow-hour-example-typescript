@@ -1,0 +1,49 @@
+{
+  "scenario": "0.1",
+  "name": "s3-theos-dare",
+  "description": "S3. Theo calls from his known number, 555-0166, which prank-score keeps as a known dare. He says nobody is hurt, plane-check finds him among the living, and he answers the keypad interview as Mrs. Alder did (it moves things and he has heard it). prank-score returns verdict high on the number alone, so hh-hotline-main tags the contact screen=prank-suspected and asks, kindly, whether this is really happening; he presses 1, the tag is cleared (untag-screen, held offline by tests/flows.test.ts: every path through the tag untags it or ends the call), and classify runs as for any caller: grade 2, Restless. The test ends after the advice (endTest defaults to true), before the district menu. The deployed stub Lambdas are not substituted.",
+  "entryPoint": {
+    "channel": "voice",
+    "flow": "${cdref:flow:hh-hotline-main}",
+    "sourcePhoneNumber": "+14135550166"
+  },
+  "steps": [
+    { "kind": "expect-prompt", "contains": "Calls are recorded" },
+    { "kind": "expect-prompt", "contains": "call your local emergency number" },
+    { "kind": "expect-lambda", "lambda": "${cdref:lambda:caller-lookup}" },
+    { "kind": "expect-prompt", "contains": "Welcome back, Theo" },
+    { "kind": "expect-prompt", "contains": "is anyone hurt" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-lambda", "lambda": "${cdref:lambda:plane-check}" },
+    { "kind": "expect-prompt", "contains": "Can you see it right now" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-prompt", "contains": "moved anything" },
+    { "kind": "send-dtmf", "value": "1" },
+    { "kind": "expect-prompt", "contains": "Is there a cold spot" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-prompt", "contains": "heard it" },
+    { "kind": "send-dtmf", "value": "1" },
+    { "kind": "expect-prompt", "contains": "touched anyone" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-prompt", "contains": "Could there be more" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-lambda", "lambda": "${cdref:lambda:prank-score}" },
+    { "kind": "expect-prompt", "contains": "Some calls are dares" },
+    { "kind": "send-dtmf", "value": "1" },
+    { "kind": "expect-lambda", "lambda": "${cdref:lambda:classify-apparition}" },
+    { "kind": "expect-prompt", "contains": "this is a Restless case" },
+    {
+      "kind": "assert",
+      "path": "$.Attributes.callerName",
+      "operator": "Equals",
+      "value": "Theo"
+    },
+    { "kind": "assert", "path": "$.Attributes.grade", "operator": "Equals", "value": "2" },
+    {
+      "kind": "assert",
+      "path": "$.Attributes.gradeName",
+      "operator": "Equals",
+      "value": "Restless"
+    }
+  ]
+}

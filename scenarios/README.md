@@ -6,13 +6,14 @@ simulated contact never reaches an agent. `tests/envScenarios.test.ts` checks
 every scenario here offline: valid for the pinned CLI, every token resolvable,
 every expected prompt and keypad press one the flows really make.
 
-| Scenario                                    | Tier | What it proves                                                                                                      |
-| ------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------- |
-| `s1-safety-path.scenario.json`              | 2    | Mrs. Alder says someone is hurt: the emergency advice, the offer to end the call, and the goodbye, with no transfer |
-| `s2-keypad-restless-old-town.scenario.json` | 1    | Mrs. Alder's keypad interview grades Restless and reaches the Old Town crew queue (stub Lambdas)                    |
-| `s5-departed-caller.scenario.json`          | 2    | A caller from 555-0193: plane-check says beyond, hh-dead-line welcomes them and queues them for the dead            |
+| Scenario                                    | Tier | What it proves                                                                                                               |
+| ------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `s1-safety-path.scenario.json`              | 2    | Mrs. Alder says someone is hurt: the emergency advice, the offer to end the call, and the goodbye, with no transfer          |
+| `s2-keypad-restless-old-town.scenario.json` | 1    | Mrs. Alder's keypad interview grades Restless and reaches the Old Town crew queue (stub Lambdas)                             |
+| `s3-theos-dare.scenario.json`               | 2    | Theo's known number scores high: the contact is tagged, he presses 1 to say it is real, the tag is cleared and classify runs |
+| `s5-departed-caller.scenario.json`          | 2    | A caller from 555-0193: plane-check says beyond, hh-dead-line welcomes them and queues them for the dead                     |
 
-S3 and S4 arrive with task T2. S6 (metrics), S8 (campaigns) and S9
+S4 arrives with task T2 (PR 6). S6 (metrics), S8 (campaigns) and S9
 (chat view) cannot be simulated (VERIFY.md, row 15).
 
 ## Running one

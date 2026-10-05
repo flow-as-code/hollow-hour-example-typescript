@@ -288,8 +288,9 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       five flow types and five reference types Tier 1 used, and tier 2's
       names CUSTOMER_HOLD and AGENT_HOLD (PR 2) and
       UpdateContactRecordingBehavior, UpdateContactRoutingBehavior and
-      UpdateContactCallbackNumber (PR 3). The other four action types and
-      the `prompt` reference type join it with the PRs that land them.
+      UpdateContactCallbackNumber (PR 3) and UntagContact (PR 4). The other
+      three action types and the `prompt` reference type join it with the
+      PRs that land them.
 - [ ] 4, in part: the generic-block policy test (PR 1, `tests/flows.test.ts`,
       "generic blocks"): every companion in `flows/` and `seasonal/` writes
       no `GenericBlock` for a type the catalog models, with the mutation case
@@ -309,10 +310,20 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       references its caller back; every UpdateContactCallbackNumber reads
       `$.CustomerEndpoint.Address` and wires both errors; no path reaches
       `to-dead-line` without `ask-anyone-hurt`; and the district-name walk
-      covers the dead line (`queue:the-dead` wants `Beyond`).
-- [ ] 8, in part: S1 (`scenarios/s1-safety-path.scenario.json`, PR 1) and
-      S5 (`scenarios/s5-departed-caller.scenario.json`, PR 3), checked
-      offline by `tests/envScenarios.test.ts`; neither run live yet.
+      covers the dead line (`queue:the-dead` wants `Beyond`). PR 4 adds,
+      each with its mutation case: no path from a yes to "Is anyone hurt?"
+      reaches `prank-score` (a walk that tracks the `injured` flow
+      attribute through the Compare), and every path through a TagContact
+      `screen` reaches `untag-screen` or the disconnect before it leaves the
+      flow.
+- [ ] 5, in part: the new flows are under the banned-terms, phone-range and
+      emergency-line checks like every other; PR 4 adds the kind ending of
+      the prank path (`dare-goodbye` thanks the caller and invites them
+      back, `kind-check` says it is all right) and bans accusations.
+- [ ] 8, in part: S1 (`scenarios/s1-safety-path.scenario.json`, PR 1), S5
+      (`scenarios/s5-departed-caller.scenario.json`, PR 3) and S3
+      (`scenarios/s3-theos-dare.scenario.json`, PR 4), checked offline by
+      `tests/envScenarios.test.ts`; none run live yet.
 - [ ] 9, in part: `tests/verify.test.ts` accepts `docs-checked YYYY-MM-DD`
       and `harness-checked YYYY-MM-DD: <result>` beside the two earlier
       shapes, each with positive and negative cases (PR 1). HC1 added with
@@ -334,7 +345,7 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       user in this tier), and the 30-day expiry caps the exposure.
 - [ ] 1, 2, 6: held by `npm run check` and the emit tests at each PR; the
       Terraform-first side of 1 waits on the mirror.
-- [ ] 5, 7, 10: not started.
+- [ ] 7, 10: not started.
 
 ## VERIFY rows this tier adds
 
