@@ -25,6 +25,9 @@ const harborside = `${inst}/queue/q-2`;
 const alwaysOpen = `${inst}/operating-hours/h-1`;
 const lookup = `${prefix}:lambda:us-west-2:123:function:hh-dev-caller-lookup`;
 const alias = `${inst}/flow-module/m-1:a-1`;
+// An agent queue has no resource of its own: the flows type it as `queue:`
+// and bind it to the Connect user's ARN (VERIFY.md, row 16.11).
+const bo = `${inst}/agent/u-1`;
 
 const map = {
   "queue:old-town-crew": oldTown,
@@ -33,6 +36,7 @@ const map = {
   "hours:the-dead": alwaysOpen,
   "lambda:caller-lookup": lookup,
   "module:greeting@live": alias,
+  "queue:crew-bo": bo,
 };
 
 const flow = (queue: string, extra: Record<string, unknown> = {}) => ({
@@ -57,6 +61,12 @@ describe("drift normalizer", () => {
     expect(arnType(`${inst}/contact-flow/f-1`)).toBe("flow");
     expect(arnType(alias)).toBe("module");
     expect(arnType(lookup)).toBe("lambda");
+  });
+
+  it("reads an agent ARN as a queue, the type the flows give an agent queue", () => {
+    expect(arnType(bo)).toBe("queue");
+    expect(normalize(bo)).toBe("${ref:queue}");
+    expect(normalize("${cdref:queue:crew-bo}", map)).toBe(normalize(bo, map));
   });
 
   it("gives a token and the ARN its key binds the same form, through the map", () => {
@@ -113,6 +123,14 @@ describe("drift comparison", () => {
   it("finds no drift between a FlowDoc and the live flow it deployed as", () => {
     expect(compareContent(flow("${cdref:queue:old-town-crew}"), flow(oldTown), map)).toEqual([]);
     expect(compareContent(flow("${cdref:queue:old-town-crew}"), flow(oldTown))).toEqual([]);
+  });
+
+  it("finds no drift between a queue token and the agent ARN it binds to", () => {
+    // Tier 3 binds `queue:crew-bo` to a Connect user; without the map the
+    // comparison is by type, and `agent` must read as `queue` or every flow
+    // that names the agent queue is reported as changed when nothing is.
+    expect(compareContent(flow("${cdref:queue:crew-bo}"), flow(bo))).toEqual([]);
+    expect(compareContent(flow("${cdref:queue:crew-bo}"), flow(bo), map)).toEqual([]);
   });
 
   it("finds a reference moved to another resource when the map is there", () => {
