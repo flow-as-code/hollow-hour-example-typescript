@@ -33,17 +33,32 @@
 //   after the dequeue (VERIFY Q1). Whispers read those attributes.
 // - hh-district-menu is generated too, so adding a district is one config
 //   entry: the menu gains its key, and no hand-authored flow changes.
+// - Callbacks (tasks/README.md, tier decision 6): every CreateCallbackContact
+//   names queue:dispatch-overflow explicitly, never a crew queue, with static
+//   delays and attempts (VERIFY 16.2). hh-district-<slug> offers one after
+//   hours and at overflow-full (the sibling crew is full too; dispatch-overflow
+//   is not known to be) through module:hh-offer-callback@live, an in-set
+//   module: the typed Refs.module needs an alias, so the emitter writes the
+//   module's version and live alias into the same flows.tf, applied with the
+//   flows that invoke it. It never offers one at lines-busy, which is
+//   reached exactly when dispatch-overflow is full, where the create would
+//   take its error branch. The queue flow cannot invoke a module, so it
+//   inlines the same two blocks when crew-eta says the wait is long, and
+//   ends that path with DisconnectParticipant, never EndFlowExecution, so no
+//   caller is both queued and holding a callback.
 
 import {
   CheckHoursOfOperation,
   CheckMetricData,
   Compare,
+  CreateCallbackContact,
   DequeueContactAndTransferToQueue,
   DisconnectParticipant,
   EndFlowExecution,
   Flow,
   GetMetricData,
   GetParticipantInput,
+  InvokeFlowModule,
   InvokeLambdaFunction,
   Loop,
   MessageParticipant,
@@ -52,6 +67,7 @@ import {
   TransferContactToQueue,
   TransferToFlow,
   UpdateContactAttributes,
+  UpdateContactCallbackNumber,
   UpdateContactEventHooks,
   UpdateContactTargetQueue,
   UpdateFlowAttributes,
@@ -71,6 +87,13 @@ export const MOVE_INTERRUPT_SECONDS = 5;
 export const HOLD_INTERRUPT_SECONDS = 30;
 /** How many times the queue flow polls before it settles into the long hold. */
 export const POLL_ROUNDS = 3;
+
+/** The callback's static schedule (VERIFY 16.2): first attempt, retries, and the gap between them. */
+export const CALLBACK_SCHEDULE = {
+  initialCallDelaySeconds: 60,
+  maximumConnectionAttempts: 2,
+  retryDelaySeconds: 600,
+} as const;
 
 function sibling(d: District, districts: readonly District[]): District {
   const found = districts.find((x) => x.slug === d.overflowTo);
@@ -204,14 +227,38 @@ export function districtFlow(d: District, districts: readonly District[]): Flow 
     new TransferContactToQueue({
       id: "transfer-to-overflow",
       next: "hang-up",
-      onQueueAtCapacity: "lines-busy",
+      onQueueAtCapacity: "overflow-full",
       onError: "apologize",
+    }),
+    new MessageParticipant({
+      id: "overflow-full",
+      text: `The $.FlowAttributes.overflowCrew crew is full as well, so every crew near you is out tonight.`,
+      next: "offer-callback",
+      onError: "offer-callback",
     }),
     new MessageParticipant({
       id: "after-hours",
       text: `The ${d.name} crew is off shift right now. Night crews start at 4 in the afternoon. If anyone is hurt or in danger, call your local emergency number (911 in the US).`,
-      next: "hang-up",
+      next: "offer-callback",
+      onError: "offer-callback",
+    }),
+    new GetParticipantInput({
+      id: "offer-callback",
+      text: "We can call you back instead. For a callback, press 1. To end the call, press 2.",
+      timeoutSeconds: 8,
+      branches: [
+        { digit: "1", target: "take-callback" },
+        { digit: "2", target: "hang-up" },
+      ],
+      onTimeout: "hang-up",
+      onNoMatch: "hang-up",
       onError: "hang-up",
+    }),
+    new InvokeFlowModule({
+      id: "take-callback",
+      module: Refs.module("hh-offer-callback", "live"),
+      next: "hang-up",
+      onError: "apologize",
     }),
     ...dispatchBlocks(),
   );
@@ -256,9 +303,60 @@ export function queueExperienceFlow(d: District, districts: readonly District[])
     new MessageParticipant({
       id: "share-eta",
       text: `The ${d.name} crew expects to be free in about $.External.etaMinutes minutes.`,
-      next: "check-sibling",
+      next: "check-eta-band",
       onError: "check-sibling",
     }),
+    new Compare({
+      id: "check-eta-band",
+      value: jsonPath("$.External.etaBand"),
+      branches: [{ operator: "Equals", operands: ["later"], target: "offer-callback" }],
+      onNoMatch: "check-sibling",
+    }),
+    new GetParticipantInput({
+      id: "offer-callback",
+      text: "That is a long wait. For a callback from the next crew that comes free, press 1. To keep your place in line, press 2.",
+      timeoutSeconds: 6,
+      branches: [
+        { digit: "1", target: "set-callback-number" },
+        { digit: "2", target: "check-sibling" },
+      ],
+      onTimeout: "check-sibling",
+      onNoMatch: "check-sibling",
+      onError: "check-sibling",
+    }),
+    new UpdateContactCallbackNumber({
+      id: "set-callback-number",
+      callbackNumber: jsonPath("$.CustomerEndpoint.Address"),
+      next: "create-callback",
+      onInvalidNumber: "cannot-ring-back",
+      onNotDialable: "cannot-ring-back",
+    }),
+    new MessageParticipant({
+      id: "cannot-ring-back",
+      text: "We cannot ring you back at the number you are calling from, so we will keep your place in line.",
+      next: "hold",
+      onError: "hold",
+    }),
+    new CreateCallbackContact({
+      id: "create-callback",
+      queue: Refs.queue("dispatch-overflow"),
+      ...CALLBACK_SCHEDULE,
+      next: "callback-taken",
+      onError: "callback-refused",
+    }),
+    new MessageParticipant({
+      id: "callback-refused",
+      text: "We cannot take a callback right now, so we will keep your place in line.",
+      next: "hold",
+      onError: "hold",
+    }),
+    new MessageParticipant({
+      id: "callback-taken",
+      text: "You are on the list. A crew will call you back as soon as one comes free. Keep the lights on until then.",
+      next: "let-go",
+      onError: "let-go",
+    }),
+    new DisconnectParticipant({ id: "let-go" }),
     new CheckMetricData({
       id: "check-sibling",
       queue: crewQueue(over.slug),

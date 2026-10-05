@@ -1,0 +1,61 @@
+{
+  "scenario": "0.1",
+  "name": "s4-after-hours-callback",
+  "description": "S4. Mrs. Alder calls as in S2, grades Restless and picks Old Town, but Old Town's hours are substituted with hours:closed (open one minute a week, Sunday 03:00 to 03:01 America/New_York; never run S4 in that minute, VERIFY.md HC1), so hh-district-old-town takes the after-hours branch, says the crew is off shift, and offers a callback. She presses 1, which invokes module:hh-offer-callback: UpdateContactCallbackNumber from her own number, then CreateCallbackContact in queue:dispatch-overflow. Neither the module invoke nor the create is an event the pinned flow-cli observes, so the offer prompt and the keypress are the last observations and the test ends there (endTest defaults to true). Whether EndTest at that point keeps a real callback from being created is VERIFY.md CB1; after every run, sweep dispatch-overflow for callback contacts and stop each one (scenarios/README.md, \"After an S4 run\"), because two leaked callbacks fill the queue's cap of 2 in dev and qa.",
+  "entryPoint": {
+    "channel": "voice",
+    "flow": "${cdref:flow:hh-hotline-main}",
+    "sourcePhoneNumber": "+14135550142"
+  },
+  "substitutions": [
+    {
+      "actionType": "CheckHoursOfOperation",
+      "actionParameters": { "HoursOfOperationId": "${cdref:hours:old-town}" },
+      "substitute": "${cdref:hours:closed}"
+    }
+  ],
+  "steps": [
+    { "kind": "expect-prompt", "contains": "Calls are recorded" },
+    { "kind": "expect-prompt", "contains": "call your local emergency number" },
+    { "kind": "expect-lambda", "lambda": "${cdref:lambda:caller-lookup}" },
+    { "kind": "expect-prompt", "contains": "Welcome back, Mrs. Alder" },
+    { "kind": "expect-prompt", "contains": "is anyone hurt" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-lambda", "lambda": "${cdref:lambda:plane-check}" },
+    { "kind": "expect-prompt", "contains": "Can you see it right now" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-prompt", "contains": "moved anything" },
+    { "kind": "send-dtmf", "value": "1" },
+    { "kind": "expect-prompt", "contains": "Is there a cold spot" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-prompt", "contains": "heard it" },
+    { "kind": "send-dtmf", "value": "1" },
+    { "kind": "expect-prompt", "contains": "touched anyone" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-prompt", "contains": "Could there be more" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-lambda", "lambda": "${cdref:lambda:prank-score}" },
+    { "kind": "expect-lambda", "lambda": "${cdref:lambda:classify-apparition}" },
+    { "kind": "expect-prompt", "contains": "this is a Restless case" },
+    { "kind": "expect-prompt", "contains": "Where are you calling from" },
+    { "kind": "send-dtmf", "value": "1" },
+    { "kind": "expect-hours-check", "hours": "${cdref:hours:old-town}" },
+    { "kind": "expect-prompt", "contains": "crew is off shift right now" },
+    { "kind": "expect-prompt", "contains": "We can call you back instead" },
+    { "kind": "send-dtmf", "value": "1" },
+    {
+      "kind": "assert",
+      "path": "$.Attributes.callerName",
+      "operator": "Equals",
+      "value": "Mrs. Alder"
+    },
+    { "kind": "assert", "path": "$.Attributes.grade", "operator": "Equals", "value": "2" },
+    {
+      "kind": "assert",
+      "path": "$.Attributes.gradeName",
+      "operator": "Equals",
+      "value": "Restless"
+    },
+    { "kind": "assert", "path": "$.Attributes.district", "operator": "Equals", "value": "old-town" }
+  ]
+}

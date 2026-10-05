@@ -362,11 +362,28 @@
           "Errors": [
             {
               "ErrorType": "QueueAtCapacity",
-              "NextAction": "lines-busy"
+              "NextAction": "overflow-full"
             },
             {
               "ErrorType": "NoMatchingError",
               "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "overflow-full",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "The $.FlowAttributes.overflowCrew crew is full as well, so every crew near you is out tonight."
+        },
+        "Transitions": {
+          "NextAction": "offer-callback",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "offer-callback"
             }
           ],
           "Conditions": []
@@ -379,11 +396,74 @@
           "Text": "The Graveyard Hill crew is off shift right now. Night crews start at 4 in the afternoon. If anyone is hurt or in danger, call your local emergency number (911 in the US)."
         },
         "Transitions": {
+          "NextAction": "offer-callback",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "offer-callback"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "offer-callback",
+        "Type": "GetParticipantInput",
+        "Parameters": {
+          "InputTimeLimitSeconds": "8",
+          "StoreInput": "False",
+          "Text": "We can call you back instead. For a callback, press 1. To end the call, press 2."
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "InputTimeLimitExceeded",
+              "NextAction": "hang-up"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "hang-up"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hang-up"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "take-callback",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "NextAction": "hang-up",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "2"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "take-callback",
+        "Type": "InvokeFlowModule",
+        "Parameters": {
+          "FlowModuleId": "${cdref:module:hh-offer-callback@live}"
+        },
+        "Transitions": {
           "NextAction": "hang-up",
           "Errors": [
             {
               "ErrorType": "NoMatchingError",
-              "NextAction": "hang-up"
+              "NextAction": "apologize"
             }
           ],
           "Conditions": []
@@ -590,8 +670,8 @@
       "y": 20
     },
     "apologize": {
-      "x": 4440,
-      "y": 120
+      "x": 5220,
+      "y": 20
     },
     "check-hours": {
       "x": 1840,
@@ -614,12 +694,12 @@
       "y": 120
     },
     "hang-up": {
-      "x": 4700,
+      "x": 5480,
       "y": 20
     },
     "lines-busy": {
-      "x": 4440,
-      "y": 20
+      "x": 2360,
+      "y": 220
     },
     "note-dispatch": {
       "x": 540,
@@ -631,6 +711,14 @@
     },
     "note-overflow-district": {
       "x": 3400,
+      "y": 20
+    },
+    "offer-callback": {
+      "x": 4700,
+      "y": 20
+    },
+    "overflow-full": {
+      "x": 4440,
       "y": 20
     },
     "read-queue": {
@@ -689,6 +777,10 @@
       "x": 1320,
       "y": 20
     },
+    "take-callback": {
+      "x": 4960,
+      "y": 20
+    },
     "transfer-to-crew": {
       "x": 2880,
       "y": 20
@@ -739,6 +831,12 @@
       "name": "graveyard-hill"
     },
     {
+      "token": "${cdref:module:hh-offer-callback@live}",
+      "type": "module",
+      "name": "hh-offer-callback",
+      "alias": "live"
+    },
+    {
       "token": "${cdref:queue:dispatch-overflow}",
       "type": "queue",
       "name": "dispatch-overflow"
@@ -756,7 +854,7 @@
   ],
   "meta": {
     "generator": "hollow-hour-example generators/districts.ts",
-    "sourceHash": "sha256:15e656fa5bc64ec3e8197497d09a1002b74a005f0c7352eaeaad8933dd319681",
+    "sourceHash": "sha256:684fd7f53aaa83f948209b16f923808220f4700299196b07160960a42b272607",
     "sourceKind": "ts"
   }
 }

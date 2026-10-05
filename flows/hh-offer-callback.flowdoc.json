@@ -1,0 +1,154 @@
+{
+  "flowdoc": "0.2",
+  "kind": "module",
+  "name": "hh-offer-callback",
+  "description": "Takes a callback for a caller who cannot wait: the caller's own number, then a callback contact in the dispatch-overflow queue, which a crew works when the night shift starts. Invoked by hh-district-<slug> after hours and when both crews are full.",
+  "connectType": "MODULE",
+  "content": {
+    "Version": "2019-10-30",
+    "StartAction": "set-callback-number",
+    "Settings": {
+      "InputParameters": [],
+      "OutputParameters": [],
+      "Transitions": []
+    },
+    "Actions": [
+      {
+        "Identifier": "set-callback-number",
+        "Type": "UpdateContactCallbackNumber",
+        "Parameters": {
+          "CallbackNumber": "$.CustomerEndpoint.Address"
+        },
+        "Transitions": {
+          "NextAction": "create-callback",
+          "Errors": [
+            {
+              "ErrorType": "InvalidCallbackNumber",
+              "NextAction": "cannot-ring-back"
+            },
+            {
+              "ErrorType": "CallbackNumberNotDialable",
+              "NextAction": "cannot-ring-back"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "create-callback",
+        "Type": "CreateCallbackContact",
+        "Parameters": {
+          "InitialCallDelaySeconds": "60",
+          "MaximumConnectionAttempts": "2",
+          "QueueId": "${cdref:queue:dispatch-overflow}",
+          "RetryDelaySeconds": "600"
+        },
+        "Transitions": {
+          "NextAction": "callback-taken",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "callback-refused"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "callback-taken",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "You are on the list. A crew will call when the night shift starts, or sooner if one comes free. Keep the lights on until then."
+        },
+        "Transitions": {
+          "NextAction": "done",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "done"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "callback-refused",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "We cannot take a callback right now; please call back in a few minutes."
+        },
+        "Transitions": {
+          "NextAction": "done",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "done"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "cannot-ring-back",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "We cannot ring you back at the number you are calling from, so please call us again when the night shift starts."
+        },
+        "Transitions": {
+          "NextAction": "done",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "done"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "done",
+        "Type": "EndFlowModuleExecution",
+        "Parameters": {},
+        "Transitions": {}
+      }
+    ]
+  },
+  "layout": {
+    "callback-refused": {
+      "x": 540,
+      "y": 120
+    },
+    "callback-taken": {
+      "x": 540,
+      "y": 20
+    },
+    "cannot-ring-back": {
+      "x": 280,
+      "y": 120
+    },
+    "create-callback": {
+      "x": 280,
+      "y": 20
+    },
+    "done": {
+      "x": 800,
+      "y": 20
+    },
+    "set-callback-number": {
+      "x": 20,
+      "y": 20
+    }
+  },
+  "refs": [
+    {
+      "token": "${cdref:queue:dispatch-overflow}",
+      "type": "queue",
+      "name": "dispatch-overflow"
+    }
+  ],
+  "meta": {
+    "generator": "cli@0.2.1",
+    "sourceHash": "sha256:4f50e810d71a80e2df7cabe6c0522cccc19a0b972d50136f747e997072253e99",
+    "sourceKind": "ts"
+  }
+}

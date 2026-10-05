@@ -85,7 +85,7 @@ export function resolveAddress(resources, address) {
 }
 
 /**
- * The resource map for one profile: every address-map key plus every flow.
+ * The resource map for one profile: every address-map key plus every flow, in-set module and alias.
  * @param {Record<string, string>} addressMap
  * @param {StateResource[]} resources
  * @returns {{ map: Record<string, string>, missing: string[] }}
@@ -99,11 +99,32 @@ export function buildResourceMap(addressMap, resources) {
     if (value === undefined) missing.push(`${key} (${address})`);
     else map[key] = value;
   }
-  for (const r of resources) {
-    if (r.mode !== "managed" || r.type !== "flowascode_contact_flow") continue;
-    const flowName = r.values?.name;
+  // Every flow, every in-set module (hh-offer-callback since T2) and every
+  // alias of one (module:<name>@<alias>), by name: the emitter binds those
+  // itself, so no address map names them.
+  const managed = resources.filter((r) => r.mode === "managed");
+  /** @type {Record<string, "flow" | "module" | undefined>} */
+  const kinds = { flowascode_contact_flow: "flow", flowascode_contact_flow_module: "module" };
+  /** @type {Map<string, string>} */
+  const moduleNames = new Map();
+  for (const r of managed) {
+    const kind = kinds[r.type];
+    if (kind === undefined) continue;
+    const name = r.values?.name;
     const arn = r.values?.arn;
-    if (typeof flowName === "string" && typeof arn === "string") map[`flow:${flowName}`] = arn;
+    if (typeof name !== "string" || typeof arn !== "string") continue;
+    map[`${kind}:${name}`] = arn;
+    const moduleId = r.values?.contact_flow_module_id;
+    if (kind === "module" && typeof moduleId === "string") moduleNames.set(moduleId, name);
+  }
+  for (const r of managed) {
+    if (r.type !== "flowascode_contact_flow_module_alias") continue;
+    const module = moduleNames.get(String(r.values?.contact_flow_module_id));
+    const alias = r.values?.name;
+    const arn = r.values?.arn;
+    if (module !== undefined && typeof alias === "string" && typeof arn === "string") {
+      map[`module:${module}@${alias}`] = arn;
+    }
   }
   const sorted = Object.fromEntries(Object.entries(map).sort(([a], [b]) => (a < b ? -1 : 1)));
   return { map: sorted, missing };

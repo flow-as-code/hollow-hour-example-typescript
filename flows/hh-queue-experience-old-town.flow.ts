@@ -4,7 +4,9 @@
 import {
   CheckMetricData,
   Compare,
+  CreateCallbackContact,
   DequeueContactAndTransferToQueue,
+  DisconnectParticipant,
   EndFlowExecution,
   Flow,
   GetParticipantInput,
@@ -14,6 +16,7 @@ import {
   MessageParticipantIteratively,
   Refs,
   UpdateContactAttributes,
+  UpdateContactCallbackNumber,
   jsonPath,
 } from "@flow-as-code/core";
 
@@ -49,9 +52,62 @@ export function hhQueueExperienceOldTown(): Flow {
     new MessageParticipant({
       id: "share-eta",
       text: "The Old Town crew expects to be free in about $.External.etaMinutes minutes.",
-      next: "check-sibling",
+      next: "check-eta-band",
       onError: "check-sibling",
     }),
+    new Compare({
+      id: "check-eta-band",
+      value: jsonPath("$.External.etaBand"),
+      branches: [{ operator: "Equals", operands: ["later"], target: "offer-callback" }],
+      onNoMatch: "check-sibling",
+    }),
+    new GetParticipantInput({
+      id: "offer-callback",
+      text: "That is a long wait. For a callback from the next crew that comes free, press 1. To keep your place in line, press 2.",
+      timeoutSeconds: 6,
+      branches: [
+        { digit: "1", target: "set-callback-number" },
+        { digit: "2", target: "check-sibling" },
+      ],
+      onTimeout: "check-sibling",
+      onNoMatch: "check-sibling",
+      onError: "check-sibling",
+    }),
+    new UpdateContactCallbackNumber({
+      id: "set-callback-number",
+      callbackNumber: jsonPath("$.CustomerEndpoint.Address"),
+      next: "create-callback",
+      onInvalidNumber: "cannot-ring-back",
+      onNotDialable: "cannot-ring-back",
+    }),
+    new MessageParticipant({
+      id: "cannot-ring-back",
+      text: "We cannot ring you back at the number you are calling from, so we will keep your place in line.",
+      next: "hold",
+      onError: "hold",
+    }),
+    new CreateCallbackContact({
+      id: "create-callback",
+      queue: Refs.queue("dispatch-overflow"),
+      initialCallDelaySeconds: 60,
+      maximumConnectionAttempts: 2,
+      retryDelaySeconds: 600,
+      next: "callback-taken",
+      onError: "callback-refused",
+    }),
+    new MessageParticipant({
+      id: "callback-refused",
+      text: "We cannot take a callback right now, so we will keep your place in line.",
+      next: "hold",
+      onError: "hold",
+    }),
+    new MessageParticipant({
+      id: "callback-taken",
+      text: "You are on the list. A crew will call you back as soon as one comes free. Keep the lights on until then.",
+      next: "let-go",
+      onError: "let-go",
+    }),
+    new DisconnectParticipant({ id: "let-go" }),
     new CheckMetricData({
       id: "check-sibling",
       metric: "NumberOfAgentsAvailable",

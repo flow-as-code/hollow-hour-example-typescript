@@ -63,11 +63,12 @@ function fakeResourceMap(): Record<string, string> {
 }
 
 describe("scenarios/", () => {
-  it("holds S1, S2, S3 and S5", () => {
+  it("holds S1 to S5", () => {
     for (const f of [
       "s1-safety-path.scenario.json",
       "s2-keypad-restless-old-town.scenario.json",
       "s3-theos-dare.scenario.json",
+      "s4-after-hours-callback.scenario.json",
       "s5-departed-caller.scenario.json",
     ]) {
       expect(files).toContain(f);
@@ -220,6 +221,18 @@ describe("scenarios/resource-map.mjs", () => {
             name: "hh_hotline_main",
             values: { name: "hh-hotline-main", arn: "f-main" },
           },
+          {
+            mode: "managed",
+            type: "flowascode_contact_flow_module",
+            name: "hh_offer_callback",
+            values: { name: "hh-offer-callback", arn: "m-offer", contact_flow_module_id: "mid-1" },
+          },
+          {
+            mode: "managed",
+            type: "flowascode_contact_flow_module_alias",
+            name: "hh_offer_callback_live",
+            values: { name: "live", arn: "m-offer-live", contact_flow_module_id: "mid-1" },
+          },
         ],
         child_modules: [
           {
@@ -239,7 +252,7 @@ describe("scenarios/resource-map.mjs", () => {
   const resources = stateResources(state);
 
   it("reads every resource, child modules included", () => {
-    expect(resources).toHaveLength(5);
+    expect(resources).toHaveLength(7);
   });
 
   it("resolves indexed, plain and remote-state addresses, and nothing else", () => {
@@ -258,7 +271,7 @@ describe("scenarios/resource-map.mjs", () => {
     expect(resolveAddress(resources, "not an address")).toBeUndefined();
   });
 
-  it("maps flows by name and reports what the state lacks", () => {
+  it("maps flows, in-set modules and their aliases by name, and reports what the state lacks", () => {
     const { map, missing } = buildResourceMap(
       {
         "queue:old-town-crew": 'aws_connect_queue.crew["old-town"].arn',
@@ -266,7 +279,12 @@ describe("scenarios/resource-map.mjs", () => {
       },
       resources,
     );
-    expect(map).toEqual({ "flow:hh-hotline-main": "f-main", "queue:old-town-crew": "q-old-town" });
+    expect(map).toEqual({
+      "flow:hh-hotline-main": "f-main",
+      "module:hh-offer-callback": "m-offer",
+      "module:hh-offer-callback@live": "m-offer-live",
+      "queue:old-town-crew": "q-old-town",
+    });
     expect(missing).toEqual([
       "prompt:salt-line-tips (awscc_connect_prompt.salt_line_tips.prompt_arn)",
     ]);
@@ -277,5 +295,6 @@ describe("scenarios/resource-map.mjs", () => {
     expect(keys).toContain("flow:hh-hotline-main");
     expect(keys).toContain("lambda:classify-apparition");
     expect(keys).toContain("hours:the-dead");
+    expect(keys).toContain("hours:closed");
   });
 });
