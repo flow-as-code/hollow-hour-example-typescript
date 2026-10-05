@@ -7,6 +7,7 @@ import {
   CreateCallbackContact,
   DequeueContactAndTransferToQueue,
   DisconnectParticipant,
+  DistributeByPercentage,
   EndFlowExecution,
   Flow,
   GetParticipantInput,
@@ -15,6 +16,7 @@ import {
   MessageParticipant,
   MessageParticipantIteratively,
   Refs,
+  TagContact,
   UpdateContactAttributes,
   UpdateContactCallbackNumber,
   jsonPath,
@@ -32,7 +34,36 @@ export function hhQueueExperienceOldTown(): Flow {
       id: "check-moved",
       value: jsonPath("$.Attributes.moved"),
       branches: [{ operator: "Equals", operands: ["true"], target: "settle-in" }],
-      onNoMatch: "poll-crews",
+      onNoMatch: "pick-hold-variant",
+    }),
+    new DistributeByPercentage({
+      id: "pick-hold-variant",
+      branches: [{ percent: 50, target: "note-spoken-variant" }],
+      onRemainder: "note-recorded-variant",
+    }),
+    new UpdateContactAttributes({
+      id: "note-spoken-variant",
+      attributes: { holdVariant: "spoken" },
+      next: "tag-spoken-variant",
+      onError: "poll-crews",
+    }),
+    new TagContact({
+      id: "tag-spoken-variant",
+      tags: { holdVariant: "spoken" },
+      next: "poll-crews",
+      onError: "poll-crews",
+    }),
+    new UpdateContactAttributes({
+      id: "note-recorded-variant",
+      attributes: { holdVariant: "recorded" },
+      next: "tag-recorded-variant",
+      onError: "poll-crews",
+    }),
+    new TagContact({
+      id: "tag-recorded-variant",
+      tags: { holdVariant: "recorded" },
+      next: "poll-crews",
+      onError: "poll-crews",
     }),
     new Loop({
       id: "poll-crews",
@@ -160,8 +191,14 @@ export function hhQueueExperienceOldTown(): Flow {
       next: "hold",
       onError: "hold",
     }),
-    new MessageParticipantIteratively({
+    new Compare({
       id: "hold",
+      value: jsonPath("$.Attributes.holdVariant"),
+      branches: [{ operator: "Equals", operands: ["recorded"], target: "hold-recorded" }],
+      onNoMatch: "hold-spoken",
+    }),
+    new MessageParticipantIteratively({
+      id: "hold-spoken",
       messages: [
         {
           text: "While you wait: keep the lights on, keep pets close, and stay in a room with a door you can open.",
@@ -171,6 +208,13 @@ export function hhQueueExperienceOldTown(): Flow {
       interruptFrequencySeconds: 30,
       onInterrupt: "poll-crews",
       onError: "settle-in",
+    }),
+    new MessageParticipantIteratively({
+      id: "hold-recorded",
+      messages: [{ prompt: Refs.prompt("salt-line-tips") }],
+      interruptFrequencySeconds: 30,
+      onInterrupt: "poll-crews",
+      onError: "hold-spoken",
     }),
     new MessageParticipantIteratively({
       id: "settle-in",

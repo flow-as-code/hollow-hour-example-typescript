@@ -175,10 +175,6 @@ describe("names and references", () => {
   // and naming the gate that will use it. A listed key a flow does use fails
   // too, so the list cannot go stale.
   const UNUSED_UNTIL: Record<string, { gate: string; since: string }> = {
-    "prompt:salt-line-tips": {
-      gate: "T2 PR 7, the prompt and the A/B split",
-      since: "2026-10-05",
-    },
     "module:hh-collect-address": {
       gate: "T2 PR 8, once flow-as-code C11 is on npm",
       since: "2026-10-05",
@@ -1024,6 +1020,140 @@ describe("the callback number", () => {
 });
 
 /**
+ * A DistributeByPercentage, as the shape that routes every value: a random
+ * number from 1 to 100 routed by ascending NumberLessThan thresholds, each
+ * branch taking the values from the previous threshold up to its own, and the
+ * NoMatchingCondition remainder (which NextAction mirrors) taking the rest.
+ * Thresholds in ascending order and at most 100 cover 1 to 100 by
+ * construction, so no sum is computed: it would be 100 for any list this
+ * accepts. Returns the problems, or none.
+ */
+function percentageProblems(d: FlowDoc, a: FlowAction): string[] {
+  const where = `${d.name}#${a.Identifier}`;
+  const out: string[] = [];
+  const remainder = (a.Transitions.Errors ?? []).find((e) => e.ErrorType === "NoMatchingCondition");
+  if (remainder === undefined) out.push(`${where}: no remainder branch`);
+  else if (a.Transitions.NextAction !== remainder.NextAction) {
+    out.push(`${where}: NextAction does not mirror the remainder`);
+  }
+  let previous = 1;
+  for (const c of a.Transitions.Conditions ?? []) {
+    const operand = String(c.Condition.Operands[0]);
+    const threshold = Number(operand);
+    if (c.Condition.Operator !== "NumberLessThan" || !/^[1-9][0-9]*$/.test(operand)) {
+      out.push(`${where}: ${operand} is not a NumberLessThan threshold`);
+      continue;
+    }
+    if (threshold <= previous || threshold > 100) {
+      out.push(`${where}: threshold ${operand} is out of order or over 100`);
+      continue;
+    }
+    previous = threshold;
+  }
+  return out;
+}
+
+describe("the hold A/B split in the queue flows", () => {
+  const splits = flows.flatMap((l) =>
+    l.doc.content.Actions.filter((a) => a.Type === "DistributeByPercentage").map((a) => ({
+      doc: l.doc,
+      a,
+    })),
+  );
+
+  it("catches a threshold over 100, one out of order, and a split with no remainder", () => {
+    const sample = splits[0];
+    if (sample === undefined) throw new Error("no DistributeByPercentage");
+    const over = structuredClone(sample.a);
+    if (over.Transitions.Conditions?.[0])
+      over.Transitions.Conditions[0].Condition.Operands = ["101"];
+    expect(percentageProblems(sample.doc, over)).toEqual([
+      `${sample.doc.name}#pick-hold-variant: threshold 101 is out of order or over 100`,
+    ]);
+    const unordered = structuredClone(sample.a);
+    unordered.Transitions.Conditions?.push({
+      NextAction: "note-spoken-variant",
+      Condition: { Operator: "NumberLessThan", Operands: ["26"] },
+    });
+    expect(percentageProblems(sample.doc, unordered)).toEqual([
+      `${sample.doc.name}#pick-hold-variant: threshold 26 is out of order or over 100`,
+    ]);
+    const bare = structuredClone(sample.a);
+    bare.Transitions.Errors = [];
+    expect(percentageProblems(sample.doc, bare)).toEqual([
+      `${sample.doc.name}#pick-hold-variant: no remainder branch`,
+    ]);
+    // A threshold moved: still the shape that routes every value; what moves
+    // is the split, which the even-split test below holds.
+    const skewed = structuredClone(sample.a);
+    if (skewed.Transitions.Conditions?.[0])
+      skewed.Transitions.Conditions[0].Condition.Operands = ["31"];
+    expect(percentageProblems(sample.doc, skewed)).toEqual([]);
+  });
+
+  it("splits in exactly the queue flows, once each", () => {
+    expect(splits.map((s) => `${s.doc.name}#${s.a.Identifier}`).sort()).toEqual(
+      districts.map((d) => `hh-queue-experience-${d.slug}#pick-hold-variant`).sort(),
+    );
+  });
+
+  it.each(splits.map((s) => [`${s.doc.name}#${s.a.Identifier}`, s] as const))(
+    "%s: ascending NumberLessThan thresholds at most 100, with a mirrored remainder",
+    (_where, s) => {
+      expect(percentageProblems(s.doc, s.a)).toEqual([]);
+    },
+  );
+
+  for (const d of districts) {
+    const q = doc(`hh-queue-experience-${d.slug}`);
+
+    it(`hh-queue-experience-${d.slug}: splits 50/50 on entry, records and tags each variant, and the hold plays the prompt or the spoken tips`, () => {
+      expect(action(q, "check-moved").Transitions.NextAction).toBe("pick-hold-variant");
+      const split = action(q, "pick-hold-variant");
+      expect(split.Transitions.Conditions).toEqual([
+        {
+          NextAction: "note-spoken-variant",
+          Condition: { Operator: "NumberLessThan", Operands: ["51"] },
+        },
+      ]);
+      expect(split.Transitions.NextAction).toBe("note-recorded-variant");
+      for (const variant of ["spoken", "recorded"]) {
+        const note = action(q, `note-${variant}-variant`);
+        expect(note.Parameters.Attributes).toEqual({ holdVariant: variant });
+        expect(note.Transitions.NextAction).toBe(`tag-${variant}-variant`);
+        const tag = action(q, `tag-${variant}-variant`);
+        expect(tag.Type).toBe("TagContact");
+        expect(tag.Parameters.Tags).toEqual({ holdVariant: variant });
+        expect(tag.Transitions.NextAction).toBe("poll-crews");
+      }
+      const hold = action(q, "hold");
+      expect(hold.Type).toBe("Compare");
+      expect(hold.Parameters.ComparisonValue).toBe("$.Attributes.holdVariant");
+      expect(hold.Transitions.Conditions).toEqual([
+        { NextAction: "hold-recorded", Condition: { Operator: "Equals", Operands: ["recorded"] } },
+      ]);
+      expect(hold.Transitions.NextAction).toBe("hold-spoken");
+      expect(action(q, "hold-recorded").Parameters.Messages).toEqual([
+        { PromptId: "${cdref:prompt:salt-line-tips}" },
+      ]);
+      const spoken = action(q, "hold-spoken").Parameters.Messages as { Text?: string }[];
+      expect(spoken.every((m) => typeof m.Text === "string")).toBe(true);
+    });
+  }
+
+  it("uses the prompt reference in the recorded variant and nowhere else", () => {
+    const prompts = flows.flatMap((l) =>
+      collectRefs(l.doc.content)
+        .filter((r) => r.type === "prompt")
+        .map((r) => `${l.doc.name}: ${refKey(r)}`),
+    );
+    expect([...new Set(prompts)].sort()).toEqual(
+      districts.map((d) => `hh-queue-experience-${d.slug}: prompt:salt-line-tips`).sort(),
+    );
+  });
+});
+
+/**
  * Every callback in a document, as a list of what is wrong with it (tier
  * decision 6, VERIFY 16.2): each CreateCallbackContact names
  * queue:dispatch-overflow explicitly, never a crew queue and never the
@@ -1434,19 +1564,28 @@ describe("generated district flows", () => {
       });
     });
 
-    it(`hh-queue-experience-${d.slug}: holds with an interruptible loop that returns to the poll`, () => {
-      const hold = action(queue, "hold");
-      expect(hold.Parameters.InterruptFrequencySeconds).toBe("30");
-      expect(hold.Transitions.Conditions).toEqual([
-        {
-          NextAction: "poll-crews",
-          Condition: { Operator: "Equals", Operands: ["MessagesInterrupted"] },
-        },
-      ]);
+    it(`hh-queue-experience-${d.slug}: holds with an interruptible loop of either variant that returns to the poll`, () => {
+      for (const id of ["hold-spoken", "hold-recorded"]) {
+        const hold = action(queue, id);
+        expect(hold.Type).toBe("MessageParticipantIteratively");
+        expect(hold.Parameters.InterruptFrequencySeconds).toBe("30");
+        expect(hold.Transitions.Conditions).toEqual([
+          {
+            NextAction: "poll-crews",
+            Condition: { Operator: "Equals", Operands: ["MessagesInterrupted"] },
+          },
+        ]);
+      }
       expect(action(queue, "poll-crews").Parameters.LoopCount).toBe("3");
-      // An error in the loop falls to the loop that keeps speaking, never to
-      // the end: a queue flow that ends leaves the caller with nothing more.
-      expect((hold.Transitions.Errors ?? []).map((e) => e.NextAction)).toEqual(["settle-in"]);
+      // An error in the spoken loop falls to the loop that keeps speaking,
+      // never to the end: a queue flow that ends leaves the caller with
+      // nothing more. An error in the recorded loop falls to the spoken one.
+      expect(
+        (action(queue, "hold-spoken").Transitions.Errors ?? []).map((e) => e.NextAction),
+      ).toEqual(["settle-in"]);
+      expect(
+        (action(queue, "hold-recorded").Transitions.Errors ?? []).map((e) => e.NextAction),
+      ).toEqual(["hold-spoken"]);
     });
   }
 });

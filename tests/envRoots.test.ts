@@ -26,11 +26,9 @@ const tfText = (dir: string) =>
 
 // Addresses the maps already bind whose resources later tasks create. Kept
 // exact in both directions: a pending address that appears in envs/ fails
-// "names exactly the pending addresses", so this list cannot go stale.
-const PENDING = new Set([
-  // T2: the prompt, through awscc.
-  "awscc_connect_prompt.salt_line_tips.prompt_arn",
-]);
+// "names exactly the pending addresses", so this list cannot go stale. Empty
+// since T2 PR 7 landed the prompt.
+const PENDING = new Set<string>([]);
 
 /** The stub names lambdas.tf zips and deploys, read from its `stubs` set. */
 function stubNames(env: string): Set<string> {
@@ -136,6 +134,22 @@ describe("envs/", () => {
         expect(text, dir).not.toMatch(/^\s*default\s*=/m);
         expect(text, dir).toMatch(/backend "s3" \{\}/);
       }
+    }
+  });
+
+  // awscc has no default_tags, so the prompt tags itself: the same two tags
+  // the aws provider puts on everything else, as a set of {key, value}.
+  it("tags the prompt with exactly the aws provider's default tags", () => {
+    for (const env of ENVIRONMENTS) {
+      const text = tfText(env);
+      const defaults = /default_tags \{\s*tags = local\.tags\s*\}/.exec(text);
+      expect(defaults, `${env}: aws default_tags`).not.toBeNull();
+      const prompt =
+        /resource "awscc_connect_prompt" "salt_line_tips" \{([\s\S]*?)\n\}/.exec(text)?.[1] ?? "";
+      expect(prompt, `${env}: the prompt`).toContain(
+        "tags         = [for key, value in local.tags : { key = key, value = value }]",
+      );
+      expect(prompt).not.toMatch(/default_tags/);
     }
   });
 

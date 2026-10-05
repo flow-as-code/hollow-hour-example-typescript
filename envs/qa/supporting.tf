@@ -3,9 +3,8 @@
 # districts come from the same districts.config.json the generator reads, so a
 # new district gets its crew queue without an edit here.
 #
-# The stub Lambdas and their instance associations are in lambdas.tf. The
-# prompt lands with T2 PR 7; tests/envRoots.test.ts lists the addresses still
-# pending.
+# The stub Lambdas and their instance associations are in lambdas.tf; the
+# recorded hold prompt, its bucket and its object are at the end of this file.
 
 locals {
   districts = {
@@ -140,4 +139,82 @@ resource "aws_connect_queue" "shared" {
   description           = each.value
   hours_of_operation_id = aws_connect_hours_of_operation.always_open.hours_of_operation_id
   max_contacts          = local.queue_max_contacts
+}
+
+# The recorded hold prompt (T2, the A/B split in hh-queue-experience-<slug>):
+# a private bucket for the audio, the committed prompts/salt-line-tips.wav as
+# its one object, and the Connect prompt made from it through awscc, which
+# every profile binds as prompt:salt-line-tips. The audio is synthesized once
+# from prompts/salt-line-tips.txt, the copy source tests/copy.test.ts scans
+# (tasks/README.md, tier decision 4; the command is in envs/README.md). Which
+# principal reads the object at CreatePrompt (the resource type's handlers
+# say the caller), what bucket policy that needs, and which audio format the
+# service accepts are settled by the first dev apply (VERIFY.md, row P1);
+# until then the bucket carries no policy.
+#
+# The object's key carries the file's MD5, so a regenerated wav changes the
+# key and with it the prompt's s3_uri: the same apply replaces the object
+# (the resource address is unchanged, so the old object is deleted) and
+# awscc updates the prompt in place (S3Uri is not a create-only property of
+# AWS::Connect::Prompt), keeping prompt_arn and every flow binding. A fixed
+# key would re-put the object and leave the prompt playing the old audio.
+# https://docs.aws.amazon.com/connect/latest/APIReference/API_CreatePrompt.html
+# https://docs.aws.amazon.com/connect/latest/adminguide/prompts.html
+
+# Bucket names are global across AWS, so the account id keeps
+# hh-<environment>-prompts unique; it is read at plan time, never committed.
+resource "aws_s3_bucket" "prompts" {
+  bucket = "${local.name_prefix}-prompts-${data.aws_caller_identity.current.account_id}"
+}
+
+resource "aws_s3_bucket_public_access_block" "prompts" {
+  bucket = aws_s3_bucket.prompts.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_ownership_controls" "prompts" {
+  bucket = aws_s3_bucket.prompts.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "prompts" {
+  bucket = aws_s3_bucket.prompts.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_object" "salt_line_tips" {
+  bucket       = aws_s3_bucket.prompts.id
+  key          = "salt-line-tips-${filemd5("${path.module}/../../prompts/salt-line-tips.wav")}.wav"
+  source       = "${path.module}/../../prompts/salt-line-tips.wav"
+  source_hash  = filemd5("${path.module}/../../prompts/salt-line-tips.wav")
+  content_type = "audio/wav"
+
+  depends_on = [
+    aws_s3_bucket_public_access_block.prompts,
+    aws_s3_bucket_ownership_controls.prompts,
+    aws_s3_bucket_server_side_encryption_configuration.prompts,
+  ]
+}
+
+# awscc has no default_tags, so the prompt carries the module's two tags
+# itself, as a set of {key, value} objects rather than a map;
+# tests/envRoots.test.ts holds them equal to local.tags.
+resource "awscc_connect_prompt" "salt_line_tips" {
+  instance_arn = data.aws_connect_instance.this.arn
+  name         = "${local.name_prefix}-salt-line-tips"
+  description  = "The recorded variant of the hold tips, for the A/B split in the queue flows."
+  s3_uri       = "s3://${aws_s3_object.salt_line_tips.bucket}/${aws_s3_object.salt_line_tips.key}"
+  tags         = [for key, value in local.tags : { key = key, value = value }]
 }

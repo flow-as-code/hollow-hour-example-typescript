@@ -65,10 +65,12 @@ const TIER_FLOOR: Record<string, Floor> = {
   },
   // T2 PR 2: the hold flows. PR 3: the dead line's three action types.
   // PR 4: the prank screen's UntagContact. PR 5: the work order's
-  // UpdateContactData. PR 6: the callbacks' CreateCallbackContact.
+  // UpdateContactData. PR 6: the callbacks' CreateCallbackContact. PR 7: the
+  // hold A/B split's DistributeByPercentage and the prompt reference type.
   "2": {
     actionTypes: [
       "CreateCallbackContact",
+      "DistributeByPercentage",
       "UntagContact",
       "UpdateContactCallbackNumber",
       "UpdateContactData",
@@ -76,7 +78,7 @@ const TIER_FLOOR: Record<string, Floor> = {
       "UpdateContactRoutingBehavior",
     ],
     flowTypes: ["AGENT_HOLD", "CUSTOMER_HOLD"],
-    refTypes: [],
+    refTypes: ["prompt"],
   },
 };
 
@@ -150,6 +152,31 @@ describe("coverage", () => {
         TIER_FLOOR["1"] ?? { actionTypes: [], flowTypes: [], refTypes: [] },
       ),
     ).toEqual(["action type Loop"]);
+    const withoutPrompt = docs.map((d) => ({
+      ...d,
+      content: {
+        ...d.content,
+        Actions: d.content.Actions.map((a) =>
+          a.Type === "MessageParticipantIteratively"
+            ? {
+                ...a,
+                Parameters: {
+                  ...a.Parameters,
+                  Messages: (a.Parameters.Messages as { PromptId?: string }[]).map((m) =>
+                    "PromptId" in m ? { Text: "spoken instead" } : m,
+                  ),
+                },
+              }
+            : a,
+        ),
+      },
+    }));
+    expect(
+      floorProblems(
+        withoutPrompt,
+        TIER_FLOOR["2"] ?? { actionTypes: [], flowTypes: [], refTypes: [] },
+      ),
+    ).toEqual(["reference type prompt"]);
   });
 
   it.each(Object.entries(TIER_FLOOR))("meets the tier %s floor", (_tier, floor) => {

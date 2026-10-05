@@ -164,6 +164,76 @@ describe("the closed hours (T2, scenario S4)", () => {
   });
 });
 
+describe("the recorded prompt (T2, the hold A/B split)", () => {
+  for (const env of ENVIRONMENTS) {
+    const text = read(env, "supporting.tf");
+    const providers = read(env, "providers.tf");
+
+    it(`${env}: declares awscc with region only, no default_tags and no skip_ flags`, () => {
+      expect(providers).toMatch(
+        /awscc = \{\s*source\s*= "hashicorp\/awscc"\s*version = "~> 1\.104"/,
+      );
+      const block = /provider "awscc" \{([\s\S]*?)\n\}/.exec(providers)?.[1] ?? "";
+      expect(block.trim()).toBe("region = var.aws_region");
+    });
+
+    it(`${env}: keeps the audio in a private, encrypted bucket with one object from prompts/`, () => {
+      for (const r of [
+        "aws_s3_bucket.prompts",
+        "aws_s3_bucket_public_access_block.prompts",
+        "aws_s3_bucket_ownership_controls.prompts",
+        "aws_s3_bucket_server_side_encryption_configuration.prompts",
+        "aws_s3_object.salt_line_tips",
+        "awscc_connect_prompt.salt_line_tips",
+      ]) {
+        expect(resources(env), r).toContain(r);
+      }
+      expect(text).toMatch(
+        /bucket = "\$\{local\.name_prefix\}-prompts-\$\{data\.aws_caller_identity\.current\.account_id\}"/,
+      );
+      for (const flag of [
+        "block_public_acls       = true",
+        "block_public_policy     = true",
+        "ignore_public_acls      = true",
+        "restrict_public_buckets = true",
+        'sse_algorithm = "AES256"',
+        'object_ownership = "BucketOwnerEnforced"',
+      ]) {
+        expect(text).toContain(flag);
+      }
+      expect(text).toContain('source       = "${path.module}/../../prompts/salt-line-tips.wav"');
+      // The MD5 in the key is what carries a regenerated wav to the prompt:
+      // s3_uri changes with it, and awscc updates the prompt in place.
+      expect(text).toContain(
+        'key          = "salt-line-tips-${filemd5("${path.module}/../../prompts/salt-line-tips.wav")}.wav"',
+      );
+      expect(text).toContain(
+        'source_hash  = filemd5("${path.module}/../../prompts/salt-line-tips.wav")',
+      );
+      expect(text).not.toMatch(/aws_s3_bucket_policy/);
+    });
+
+    it(`${env}: makes the prompt from that object on this instance`, () => {
+      const prompt =
+        /resource "awscc_connect_prompt" "salt_line_tips" \{([\s\S]*?)\n\}/.exec(text)?.[1] ?? "";
+      expect(prompt).toContain("instance_arn = data.aws_connect_instance.this.arn");
+      expect(prompt).toContain('name         = "${local.name_prefix}-salt-line-tips"');
+      expect(prompt).toContain(
+        's3_uri       = "s3://${aws_s3_object.salt_line_tips.bucket}/${aws_s3_object.salt_line_tips.key}"',
+      );
+    });
+  }
+
+  it("is the prompt:salt-line-tips binding in every profile", () => {
+    for (const profile of Object.keys(loadManifest().profiles)) {
+      const map = JSON.parse(
+        readFileSync(join(ROOT, "refs", `${profile}.tfmap.json`), "utf8"),
+      ) as Record<string, string>;
+      expect(map["prompt:salt-line-tips"]).toBe("awscc_connect_prompt.salt_line_tips.prompt_arn");
+    }
+  });
+});
+
 describe("the seasonal roots", () => {
   for (const env of ENVIRONMENTS) {
     const text = read(`seasonal-${env}`, "greetings.tf");
