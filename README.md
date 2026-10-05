@@ -293,12 +293,13 @@ instance yet.
 
 ## Tiers and status
 
-| Tier | Name          | Scope                                                                                                                                                        | Status                                                                                   |
-| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| T0   | Scaffold      | Layout, toolchain, CI, environment roots, reference manifest, VERIFY.md                                                                                      | done; owner setup open                                                                   |
-| T1   | First night   | Main line with keypad triage and interview, generated district and queue flows, whispers, seasonal greetings, supporting resources in all three environments | live in dev, qa and prod, all in us-east-1 (2026-09-30); qa S2 waits on a quota increase |
-| T2   | Full moon     | Address and callback modules, holds, prank screen, the Queue of the Dead, scenarios                                                                          | not started                                                                              |
-| T3   | Witching hour | Chat field guide, outbound follow-ups, transfers to named crew, the drift scene                                                                              | after the season                                                                         |
+| Tier | Name          | Scope                                                                                                                                                        | Status                                                                                                           |
+| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| T0   | Scaffold      | Layout, toolchain, CI, environment roots, reference manifest, VERIFY.md                                                                                      | done; owner setup open                                                                                           |
+| T1   | First night   | Main line with keypad triage and interview, generated district and queue flows, whispers, seasonal greetings, supporting resources in all three environments | live in dev, qa and prod, all in us-east-1 (2026-09-30); qa S2 waits on a quota increase                         |
+| T2   | Full moon     | Holds, the Queue of the Dead, prank screen, work orders, callbacks, a hold A/B test with a recorded prompt, the address module (when flow-as-code C04 ships) | planned 2026-10-04 ([T2](tasks/T2-full-moon.md)); not started                                                    |
+| T3   | Witching hour | Bo as an agent, transfers to him and the Lantern Crew, the outbound whisper, the chat field guide, Lex if gated in, the drift-and-adopt scene                | planned 2026-10-04 ([T3](tasks/T3-witching-hour.md)); after the season; its chat flow waits for flow-as-code C11 |
+| T4   | Full coverage | Every documented action type flow-as-code Phase D models, used here or recorded as deploy-only or not coverable with the reason                              | planned 2026-10-04 ([T4](tasks/T4-full-coverage.md)); follows Phase D releases                                   |
 
 Each tier's acceptance criteria are in [`tasks/`](tasks/).
 
