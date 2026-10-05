@@ -63,7 +63,8 @@ function fakeResourceMap(): Record<string, string> {
 }
 
 describe("scenarios/", () => {
-  it("holds S2", () => {
+  it("holds S1 and S2", () => {
+    expect(files).toContain("s1-safety-path.scenario.json");
     expect(files).toContain("s2-keypad-restless-old-town.scenario.json");
   });
 

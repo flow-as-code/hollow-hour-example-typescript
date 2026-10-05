@@ -17,10 +17,14 @@ const cells = (line: string) =>
     .split(" | ")
     .map((c) => c.trim());
 
-// A sandbox result carries its UTC date, the Region it ran in and what the
-// service said: `sandbox-checked 2026-10-01, us-west-2: accepted`.
+// A documentation check carries the UTC date it was read. A sandbox result
+// carries its UTC date, the Region it ran in and what the service said:
+// `sandbox-checked 2026-10-01, us-west-2: accepted`. A harness result (a
+// row an offline run such as the Terraform-first equivalence check settles,
+// with no instance involved) carries its UTC date and the result:
+// `harness-checked 2026-10-05: planned offline`.
 const STATUS =
-  /^(docs-checked 2026-09-30|needs sandbox|sandbox-checked \d{4}-\d{2}-\d{2}, [a-z]{2}(-gov)?-[a-z]+-\d: .+)$/;
+  /^(docs-checked \d{4}-\d{2}-\d{2}|needs sandbox|sandbox-checked \d{4}-\d{2}-\d{2}, [a-z]{2}(-gov)?-[a-z]+-\d: .+|harness-checked \d{4}-\d{2}-\d{2}: .+)$/;
 
 describe("VERIFY.md", () => {
   it("has the columns the tasks rely on", () => {
@@ -64,6 +68,21 @@ describe("VERIFY.md", () => {
     expect(STATUS.test("sandbox-checked 2026-10-01, us-west-2: accepted")).toBe(true);
     expect(STATUS.test("sandbox-checked 2026-10-01 accepted")).toBe(false);
     expect(STATUS.test("sandbox-checked 2026-10-01, accepted")).toBe(false);
+  });
+
+  it("reads a docs-checked status with any full date, never without one", () => {
+    expect(STATUS.test("docs-checked 2026-09-30")).toBe(true);
+    expect(STATUS.test("docs-checked 2026-10-05")).toBe(true);
+    expect(STATUS.test("docs-checked")).toBe(false);
+    expect(STATUS.test("docs-checked 2026-10-5")).toBe(false);
+    expect(STATUS.test("docs-checked 2026-10-05: accepted")).toBe(false);
+  });
+
+  it("reads a harness status only with its date and result, and never a Region", () => {
+    expect(STATUS.test("harness-checked 2026-10-05: planned offline")).toBe(true);
+    expect(STATUS.test("harness-checked 2026-10-05")).toBe(false);
+    expect(STATUS.test("harness-checked 2026-10-05, us-east-1: planned offline")).toBe(false);
+    expect(STATUS.test("harness-checked: planned offline")).toBe(false);
   });
 
   it("gives every row six cells, an AWS doc URL, a status and a design change", () => {

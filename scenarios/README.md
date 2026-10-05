@@ -6,11 +6,12 @@ simulated contact never reaches an agent. `tests/envScenarios.test.ts` checks
 every scenario here offline: valid for the pinned CLI, every token resolvable,
 every expected prompt and keypad press one the flows really make.
 
-| Scenario                                    | Tier | What it proves                                                                                   |
-| ------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------ |
-| `s2-keypad-restless-old-town.scenario.json` | 1    | Mrs. Alder's keypad interview grades Restless and reaches the Old Town crew queue (stub Lambdas) |
+| Scenario                                    | Tier | What it proves                                                                                                      |
+| ------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------- |
+| `s1-safety-path.scenario.json`              | 2    | Mrs. Alder says someone is hurt: the emergency advice, the offer to end the call, and the goodbye, with no transfer |
+| `s2-keypad-restless-old-town.scenario.json` | 1    | Mrs. Alder's keypad interview grades Restless and reaches the Old Town crew queue (stub Lambdas)                    |
 
-S1 and S3 to S5 arrive with task T2. S6 (metrics), S8 (campaigns) and S9
+S3 to S5 arrive with task T2. S6 (metrics), S8 (campaigns) and S9
 (chat view) cannot be simulated (VERIFY.md, row 15).
 
 ## Running one
