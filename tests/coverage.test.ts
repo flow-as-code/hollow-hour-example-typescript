@@ -63,9 +63,13 @@ const TIER_FLOOR: Record<string, Floor> = {
     flowTypes: ["AGENT_WHISPER", "CONTACT_FLOW", "CUSTOMER_QUEUE", "CUSTOMER_WHISPER", "MODULE"],
     refTypes: ["flow", "hours", "lambda", "module", "queue"],
   },
-  // T2 PR 2: the hold flows.
+  // T2 PR 2: the hold flows. PR 3: the dead line's three action types.
   "2": {
-    actionTypes: [],
+    actionTypes: [
+      "UpdateContactCallbackNumber",
+      "UpdateContactRecordingBehavior",
+      "UpdateContactRoutingBehavior",
+    ],
     flowTypes: ["AGENT_HOLD", "CUSTOMER_HOLD"],
     refTypes: [],
   },

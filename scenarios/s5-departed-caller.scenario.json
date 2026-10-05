@@ -1,0 +1,28 @@
+{
+  "scenario": "0.1",
+  "name": "s5-departed-caller",
+  "description": "S5. A departed caller rings from 555-0193, one of the numbers lambdas/README.md reserves for the dead. caller-lookup does not know them, they say nobody is hurt (the safety question is never skipped), plane-check answers beyond, and hh-hotline-main transfers to hh-dead-line: the welcome, agent-only recording, the four hooks, the routing adjustment, the callback number (either CallbackNumberNotDialable or InvalidCallbackNumber may fire for a simulated source, VERIFY.md 6.2; both rejoin, so the scenario accepts either), the check of hours:the-dead (both branches continue) and the transfer to queue:the-dead. No substitution: the dead's hours are always open. The test ends at the queue transfer.",
+  "entryPoint": {
+    "channel": "voice",
+    "flow": "${cdref:flow:hh-hotline-main}",
+    "sourcePhoneNumber": "+14135550193"
+  },
+  "steps": [
+    { "kind": "expect-prompt", "contains": "Calls are recorded" },
+    { "kind": "expect-prompt", "contains": "call your local emergency number" },
+    { "kind": "expect-lambda", "lambda": "${cdref:lambda:caller-lookup}" },
+    { "kind": "expect-prompt", "contains": "is anyone hurt" },
+    { "kind": "send-dtmf", "value": "2" },
+    { "kind": "expect-lambda", "lambda": "${cdref:lambda:plane-check}" },
+    { "kind": "expect-prompt", "contains": "line for the departed" },
+    { "kind": "expect-hours-check", "hours": "${cdref:hours:the-dead}" },
+    { "kind": "expect-transfer", "queue": "${cdref:queue:the-dead}" },
+    { "kind": "assert", "path": "$.Attributes.district", "operator": "Equals", "value": "beyond" },
+    {
+      "kind": "assert",
+      "path": "$.Attributes.districtName",
+      "operator": "Equals",
+      "value": "Beyond"
+    }
+  ]
+}

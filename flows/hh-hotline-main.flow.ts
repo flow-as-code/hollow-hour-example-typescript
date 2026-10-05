@@ -101,11 +101,31 @@ export function hhHotlineMain(): Flow {
       timeoutSeconds: 8,
       branches: [
         { digit: "1", target: "emergency-advice" },
-        { digit: "2", target: "start-interview" },
+        { digit: "2", target: "plane-check" },
       ],
       onTimeout: "emergency-advice",
       onNoMatch: "emergency-advice",
       onError: "emergency-advice",
+    }),
+    new InvokeLambdaFunction({
+      id: "plane-check",
+      lambda: Refs.lambda("plane-check"),
+      timeoutSeconds: 4,
+      responseType: "JSON",
+      next: "check-plane",
+      onError: "start-interview",
+    }),
+    new Compare({
+      id: "check-plane",
+      value: jsonPath("$.External.plane"),
+      branches: [{ operator: "Equals", operands: ["beyond"], target: "to-dead-line" }],
+      onNoMatch: "start-interview",
+    }),
+    new TransferToFlow({
+      id: "to-dead-line",
+      flow: Refs.flow("hh-dead-line"),
+      next: "hang-up",
+      onError: "start-interview",
     }),
     new MessageParticipant({
       id: "emergency-advice",

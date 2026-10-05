@@ -1,0 +1,52 @@
+{
+  "flowdoc": "0.2",
+  "kind": "flow",
+  "name": "hh-dead-whisper",
+  "description": "What the spectral liaison hears before a departed caller joins. Static copy; the dead carry no grade.",
+  "connectType": "AGENT_WHISPER",
+  "content": {
+    "Version": "2019-10-30",
+    "StartAction": "brief-the-liaison",
+    "Actions": [
+      {
+        "Identifier": "brief-the-liaison",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Spectral liaison call. Be patient; they have waited a long time."
+        },
+        "Transitions": {
+          "NextAction": "done",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "done"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "done",
+        "Type": "EndFlowExecution",
+        "Parameters": {},
+        "Transitions": {}
+      }
+    ]
+  },
+  "layout": {
+    "brief-the-liaison": {
+      "x": 20,
+      "y": 20
+    },
+    "done": {
+      "x": 280,
+      "y": 20
+    }
+  },
+  "refs": [],
+  "meta": {
+    "generator": "cli@0.2.1",
+    "sourceHash": "sha256:f20172a56f96f7762fedaa4617bd58429957274efdd9be3e66179829ff358b87",
+    "sourceKind": "ts"
+  }
+}

@@ -82,6 +82,16 @@
       "note": "The dead never close."
     },
     {
+      "key": "hours:closed",
+      "tier": 2,
+      "binding": "address-map",
+      "address": {
+        "default": "aws_connect_hours_of_operation.closed.arn"
+      },
+      "usedBy": ["S4 (substituted for hours:old-town)"],
+      "note": "Closed hours for scenario S4: open one minute a week (Sunday 03:00 to 03:01 America/New_York), because the provider's resource needs at least one config block and nothing else here is ever closed. S4 is never run in that minute (VERIFY.md, HC1)."
+    },
+    {
       "key": "lambda:caller-lookup",
       "tier": 1,
       "binding": "address-map",
@@ -115,7 +125,7 @@
       "address": {
         "default": "aws_connect_lambda_function_association.connect[\"plane-check\"].function_arn"
       },
-      "usedBy": ["hh-hotline-main"]
+      "usedBy": ["hh-hotline-main (after the safety question)"]
     },
     {
       "key": "lambda:prank-score",
@@ -200,8 +210,7 @@
       "tier": 2,
       "binding": "in-set",
       "usedBy": [
-        "hh-district-{slug}, hh-district-menu, hh-hotline-main (AgentHold hook)",
-        "hh-dead-line (AgentHold hook)"
+        "hh-district-{slug}, hh-district-menu, hh-hotline-main, hh-dead-line (AgentHold hook)"
       ]
     },
     {

@@ -1,0 +1,409 @@
+{
+  "flowdoc": "0.2",
+  "kind": "flow",
+  "name": "hh-dead-line",
+  "description": "The line for the departed, reached from hh-hotline-main when plane-check says the caller is beyond. Welcome first, then agent-only recording, the four hooks, patience, the callback number, the hours that never close, and the Queue of the Dead.",
+  "connectType": "CONTACT_FLOW",
+  "content": {
+    "Version": "2019-10-30",
+    "StartAction": "dead-welcome",
+    "Actions": [
+      {
+        "Identifier": "dead-welcome",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "You have reached the Hollow Hour line for the departed. Calls are recorded, but only our liaison's side, never yours. You are welcome here, and we are glad you called."
+        },
+        "Transitions": {
+          "NextAction": "record-agent-only",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "record-agent-only"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "record-agent-only",
+        "Type": "UpdateContactRecordingBehavior",
+        "Parameters": {
+          "RecordingBehavior": {
+            "RecordedParticipants": [
+              "Agent"
+            ]
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-dead-whisper",
+          "Errors": [],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dead-whisper",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "AgentWhisper": "${cdref:flow:hh-dead-whisper}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-dead-hold",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dead-hold"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dead-hold",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "CustomerHold": "${cdref:flow:hh-dead-hold}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-dead-queue-experience",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dead-queue-experience"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dead-queue-experience",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "CustomerQueue": "${cdref:flow:hh-dead-queue-experience}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-dead-agent-hold",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dead-agent-hold"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dead-agent-hold",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "AgentHold": "${cdref:flow:hh-agent-hold}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "note-beyond",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "note-beyond"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "note-beyond",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "district": "beyond",
+            "districtName": "Beyond",
+            "gradeName": "Departed"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "set-patience",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-patience"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-patience",
+        "Type": "UpdateContactRoutingBehavior",
+        "Parameters": {
+          "QueueTimeAdjustmentSeconds": "-300"
+        },
+        "Transitions": {
+          "NextAction": "set-callback-number",
+          "Errors": [],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-callback-number",
+        "Type": "UpdateContactCallbackNumber",
+        "Parameters": {
+          "CallbackNumber": "$.CustomerEndpoint.Address"
+        },
+        "Transitions": {
+          "NextAction": "check-dead-hours",
+          "Errors": [
+            {
+              "ErrorType": "InvalidCallbackNumber",
+              "NextAction": "cannot-ring-back"
+            },
+            {
+              "ErrorType": "CallbackNumberNotDialable",
+              "NextAction": "cannot-ring-back"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "cannot-ring-back",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "We cannot ring you back where you are, so stay on the line."
+        },
+        "Transitions": {
+          "NextAction": "check-dead-hours",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "check-dead-hours"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "check-dead-hours",
+        "Type": "CheckHoursOfOperation",
+        "Parameters": {
+          "HoursOfOperationId": "${cdref:hours:the-dead}"
+        },
+        "Transitions": {
+          "NextAction": "set-dead-queue",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dead-queue"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "set-dead-queue",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "True"
+                ]
+              }
+            },
+            {
+              "NextAction": "set-dead-queue",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "False"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "set-dead-queue",
+        "Type": "UpdateContactTargetQueue",
+        "Parameters": {
+          "QueueId": "${cdref:queue:the-dead}"
+        },
+        "Transitions": {
+          "NextAction": "transfer-to-dead",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "transfer-to-dead",
+        "Type": "TransferContactToQueue",
+        "Parameters": {},
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "QueueAtCapacity",
+              "NextAction": "dead-full"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "dead-full",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "The Queue of the Dead is full tonight, which is saying something. Call back after midnight; we will still be here, and so will you."
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hang-up"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "apologize",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "Something went wrong on our side. Please call back in a few minutes; you have the time."
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hang-up"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "hang-up",
+        "Type": "DisconnectParticipant",
+        "Parameters": {},
+        "Transitions": {}
+      }
+    ]
+  },
+  "layout": {
+    "apologize": {
+      "x": 3400,
+      "y": 120
+    },
+    "cannot-ring-back": {
+      "x": 2360,
+      "y": 20
+    },
+    "check-dead-hours": {
+      "x": 2620,
+      "y": 20
+    },
+    "dead-full": {
+      "x": 3400,
+      "y": 20
+    },
+    "dead-welcome": {
+      "x": 20,
+      "y": 20
+    },
+    "hang-up": {
+      "x": 3660,
+      "y": 20
+    },
+    "note-beyond": {
+      "x": 1580,
+      "y": 20
+    },
+    "record-agent-only": {
+      "x": 280,
+      "y": 20
+    },
+    "set-callback-number": {
+      "x": 2100,
+      "y": 20
+    },
+    "set-dead-agent-hold": {
+      "x": 1320,
+      "y": 20
+    },
+    "set-dead-hold": {
+      "x": 800,
+      "y": 20
+    },
+    "set-dead-queue": {
+      "x": 2880,
+      "y": 20
+    },
+    "set-dead-queue-experience": {
+      "x": 1060,
+      "y": 20
+    },
+    "set-dead-whisper": {
+      "x": 540,
+      "y": 20
+    },
+    "set-patience": {
+      "x": 1840,
+      "y": 20
+    },
+    "transfer-to-dead": {
+      "x": 3140,
+      "y": 20
+    }
+  },
+  "refs": [
+    {
+      "token": "${cdref:flow:hh-agent-hold}",
+      "type": "flow",
+      "name": "hh-agent-hold"
+    },
+    {
+      "token": "${cdref:flow:hh-dead-hold}",
+      "type": "flow",
+      "name": "hh-dead-hold"
+    },
+    {
+      "token": "${cdref:flow:hh-dead-queue-experience}",
+      "type": "flow",
+      "name": "hh-dead-queue-experience"
+    },
+    {
+      "token": "${cdref:flow:hh-dead-whisper}",
+      "type": "flow",
+      "name": "hh-dead-whisper"
+    },
+    {
+      "token": "${cdref:hours:the-dead}",
+      "type": "hours",
+      "name": "the-dead"
+    },
+    {
+      "token": "${cdref:queue:the-dead}",
+      "type": "queue",
+      "name": "the-dead"
+    }
+  ],
+  "meta": {
+    "generator": "cli@0.2.1",
+    "sourceHash": "sha256:a257c3baa264dd484fedbd1845993e347c25b7d21b3322647d21b8de19b8d6ef",
+    "sourceKind": "ts"
+  }
+}

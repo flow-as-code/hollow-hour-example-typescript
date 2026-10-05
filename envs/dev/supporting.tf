@@ -4,7 +4,7 @@
 # new district gets its crew queue without an edit here.
 #
 # The stub Lambdas and their instance associations are in lambdas.tf. The
-# prompt lands with T2; tests/envRoots.test.ts lists the addresses still
+# prompt lands with T2 PR 7; tests/envRoots.test.ts lists the addresses still
 # pending.
 
 locals {
@@ -84,6 +84,33 @@ resource "aws_connect_hours_of_operation" "night_shift" {
         hours   = 0
         minutes = 0
       }
+    }
+  }
+}
+
+# Closed hours for scenario S4 (the after-hours callback), substituted for a
+# district's hours at run time and read by no flow. Nothing else here is ever
+# closed (always_open, night_shift and the dead's hours all open every day),
+# and the provider's resource needs at least one config block, so this one is
+# open for one minute a week, Sunday 03:00 to 03:01 America/New_York, and S4
+# is never run in that minute. VERIFY.md, row HC1: needs a sandbox create,
+# and a CheckHoursOfOperation reading it as closed outside that minute.
+# https://docs.aws.amazon.com/connect/latest/APIReference/API_CreateHoursOfOperation.html
+resource "aws_connect_hours_of_operation" "closed" {
+  instance_id = var.connect_instance_id
+  name        = "${local.name_prefix}-closed"
+  description = "Closed, for the after-hours scenario: open one minute a week."
+  time_zone   = "America/New_York"
+
+  config {
+    day = "SUNDAY"
+    start_time {
+      hours   = 3
+      minutes = 0
+    }
+    end_time {
+      hours   = 3
+      minutes = 1
     }
   }
 }

@@ -286,7 +286,9 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
 - [ ] 3, in part: `tests/coverage.test.ts` holds a per-tier floor
       (`TIER_FLOOR`) with a mutation case; tier 1's floor is the 24 types,
       five flow types and five reference types Tier 1 used, and tier 2's
-      names CUSTOMER_HOLD and AGENT_HOLD (PR 2). The seven action types and
+      names CUSTOMER_HOLD and AGENT_HOLD (PR 2) and
+      UpdateContactRecordingBehavior, UpdateContactRoutingBehavior and
+      UpdateContactCallbackNumber (PR 3). The other four action types and
       the `prompt` reference type join it with the PRs that land them.
 - [ ] 4, in part: the generic-block policy test (PR 1, `tests/flows.test.ts`,
       "generic blocks"): every companion in `flows/` and `seasonal/` writes
@@ -299,12 +301,37 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       one hook per block; no Wait in any flow; and the key-use rule with its
       dated `UNUSED_UNTIL` list (see Deviations). The Lantern Crew and
       dispatch chains are held to four hooks and the generated district
-      flows to five.
-- [ ] 8, in part: S1 (`scenarios/s1-safety-path.scenario.json`), checked
-      offline by `tests/envScenarios.test.ts`; not yet run live.
+      flows to five. PR 3 adds, each with its mutation case: in
+      `hh-dead-line` the welcome precedes the recording block, which records
+      `["Agent"]` and has no error branch; the routing adjustment is
+      negative, static, and set before the target queue and the transfer;
+      the four hooks are present, one per block, and no hooked flow
+      references its caller back; every UpdateContactCallbackNumber reads
+      `$.CustomerEndpoint.Address` and wires both errors; no path reaches
+      `to-dead-line` without `ask-anyone-hurt`; and the district-name walk
+      covers the dead line (`queue:the-dead` wants `Beyond`).
+- [ ] 8, in part: S1 (`scenarios/s1-safety-path.scenario.json`, PR 1) and
+      S5 (`scenarios/s5-departed-caller.scenario.json`, PR 3), checked
+      offline by `tests/envScenarios.test.ts`; neither run live yet.
 - [ ] 9, in part: `tests/verify.test.ts` accepts `docs-checked YYYY-MM-DD`
       and `harness-checked YYYY-MM-DD: <result>` beside the two earlier
-      shapes, each with positive and negative cases (PR 1). No row added yet.
+      shapes, each with positive and negative cases (PR 1). HC1 added with
+      `hours:closed` (PR 3), `needs sandbox`; RS1 added for the recording
+      storage (below), `needs sandbox`.
+- [ ] Recording storage (tier decision 5), checked 2026-10-05 at 17:25 UTC:
+      `list-instance-storage-configs` for CALL_RECORDINGS returned `[]` on
+      dev, qa and prod (all us-east-1), so `envs/bootstrap/recordings.tf`
+      adds one private SSE-S3 bucket, a 30-day expiry rule and the storage
+      config per instance (PR 3), to be applied by the operator at the
+      Close, after which this line records the apply with its UTC time and
+      whether `iam list-role-policies` on each instance's service-linked
+      role shows a policy the service added. The buckets take the
+      `amazon-connect-` prefix, the only S3 resource the role's managed
+      policy grants (read 2026-10-05, v56; RS1), so the write relies on
+      nothing undocumented. The apply creates 18 resources with no standing
+      charge; a recording is billed at S3 standard storage once one exists,
+      none will until a call reaches an agent (no claimed number, no agent
+      user in this tier), and the 30-day expiry caps the exposure.
 - [ ] 1, 2, 6: held by `npm run check` and the emit tests at each PR; the
       Terraform-first side of 1 waits on the mirror.
 - [ ] 5, 7, 10: not started.
@@ -438,3 +465,21 @@ awscc_connect_prompt.salt_line_tips.prompt_arn`) and `hh-district-menu.tf`.
   at-capacity path from the Lantern Crew keeps the grade it has. The
   generated flows need no copy: `hh-district-menu` is reached only through
   `record-grade`.
+- **`hh-dead-line` sets `district`, `districtName` and `gradeName`**
+  (`beyond`, `Beyond`, `Departed`) in `note-beyond` before the routing
+  adjustment (PR 3). The plan listed no attribute block for the dead line,
+  but `hh-agent-hold`, hooked there, speaks `$.Attributes.gradeName`, and
+  the district-name walk of criterion 4 needs a name to hold
+  `queue:the-dead` to; without it the walk would pass the dead line
+  vacuously.
+- **A queue flow's loop error falls to the loop that keeps speaking** (PR 3,
+  review). `hh-dead-queue-experience` routed `reassure`'s error to an
+  EndFlowExecution, as T1's `hh-queue-experience-<slug>` routed `hold`'s;
+  a customer queue flow that ends leaves the caller in queue with nothing
+  further from it, the nearest thing to a silent dead end in the set. Both
+  now fall to `settle-in`, the no-interrupt loop, and the dead line's queue
+  flow has no end block at all. The generated flows keep `done` for the
+  callback path.
+- **A VERIFY row the plan did not list, RS1** (PR 3): the recording storage
+  config with no customer managed key is a Connect behavior newly relied on
+  (CONTRIBUTING.md), so it has a row beside HC1.

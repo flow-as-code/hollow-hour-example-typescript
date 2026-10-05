@@ -73,6 +73,48 @@ describe("envs/bootstrap", () => {
     expect(text).not.toContain("tfacc-");
   });
 
+  // Tier decision 5 (tasks/README.md): on 2026-10-05 no instance had a
+  // CALL_RECORDINGS storage config, so bootstrap adds one per environment.
+  // The bucket name takes the amazon-connect- prefix because that is the
+  // only S3 resource the service-linked role's managed policy grants, and
+  // the root adds no bucket policy (VERIFY.md, RS1).
+  it("stores call recordings in a private SSE-S3 bucket per environment, expired after 30 days, with no customer key", () => {
+    const bucket = block("aws_s3_bucket", "recordings");
+    expect(bucket).toContain("for_each = var.environments");
+    expect(bucket).toContain("region = each.value");
+    expect(bucket).toContain(
+      'bucket = "amazon-connect-hollow-hour-example-${each.key}-recordings-${random_id.suffix.hex}"',
+    );
+    // 63 characters is the S3 limit; the longest environment name is prod.
+    expect("amazon-connect-hollow-hour-example-prod-recordings-".length + 6).toBeLessThanOrEqual(
+      63,
+    );
+    expect(text).not.toContain("aws_s3_bucket_policy");
+    expect(block("aws_s3_bucket_server_side_encryption_configuration", "recordings")).toContain(
+      'sse_algorithm = "AES256"',
+    );
+    const pab = block("aws_s3_bucket_public_access_block", "recordings");
+    for (const flag of [
+      "block_public_acls",
+      "block_public_policy",
+      "ignore_public_acls",
+      "restrict_public_buckets",
+    ]) {
+      expect(pab).toMatch(new RegExp(`${flag}\\s*= true`));
+    }
+    const lifecycle = block("aws_s3_bucket_lifecycle_configuration", "recordings");
+    expect(lifecycle).toContain('status = "Enabled"');
+    expect(lifecycle).toMatch(/expiration \{\s*days = 30\s*\}/);
+    const config = block("aws_connect_instance_storage_config", "call_recordings");
+    expect(config).toContain("for_each = var.environments");
+    expect(config).toContain("instance_id   = aws_connect_instance.env[each.key].id");
+    expect(config).toContain('resource_type = "CALL_RECORDINGS"');
+    expect(config).toContain('storage_type = "S3"');
+    expect(config).toContain("bucket_name   = aws_s3_bucket.recordings[each.key].id");
+    expect(config).not.toContain("encryption_config");
+    expect(text).not.toContain("aws_kms_key");
+  });
+
   it("creates no user, routing profile or security profile: Tier 1 needs none", () => {
     expect(text).not.toMatch(/resource "aws_connect_(user|routing_profile|security_profile)"/);
   });

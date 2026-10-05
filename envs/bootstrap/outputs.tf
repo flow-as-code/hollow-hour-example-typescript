@@ -23,3 +23,8 @@ output "state_region" {
   description = "The Region of that bucket, and so the -backend-config region of every root."
   value       = aws_s3_bucket.state.region
 }
+
+output "recording_buckets" {
+  description = "Each environment's call recording bucket (envs/bootstrap/recordings.tf)."
+  value       = { for env, bucket in aws_s3_bucket.recordings : env => bucket.bucket }
+}
