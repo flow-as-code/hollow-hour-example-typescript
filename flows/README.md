@@ -64,7 +64,9 @@ continues as any other, so a wrong guess leaves no mark; 2, a timeout or an
 error plays "Thanks for keeping us on our toes. Call back any time something
 goes bump." and hangs up. `tests/flows.test.ts` holds both: no path from a
 yes to "Is anyone hurt?" reaches `prank-score`, and every path through the
-tag untags it or ends the call.
+tag untags it or ends the call, with one held exception: a failed
+`untag-screen` goes on with the tag set, because hanging up on a caller who
+pressed 1 is the worse outcome.
 
 ## What the flows read and write
 

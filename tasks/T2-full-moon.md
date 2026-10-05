@@ -233,7 +233,9 @@ Supporting resources, per environment (`envs/{dev,qa,prod}/supporting.tf`):
    - the queue flow's callback path ends in DisconnectParticipant;
    - no path from a yes to "Is anyone hurt?" reaches `prank-score`;
    - every path through a TagContact `screen` either untags it or ends the
-     call;
+     call, with one held exception: if `untag-screen` itself fails, the
+     caller who said it is really happening goes on with the tag set rather
+     than being hung up on;
    - every DistributeByPercentage sums to 100;
    - no Wait in any flow;
    - the district-name walk of T1 covers the dead line and the callback
@@ -315,7 +317,11 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       reaches `prank-score` (a walk that tracks the `injured` flow
       attribute through the Compare), and every path through a TagContact
       `screen` reaches `untag-screen` or the disconnect before it leaves the
-      flow.
+      flow. The one exception is `untag-screen`'s own error branch, which
+      goes on to `classify` with the tag set because hanging up on a caller
+      who pressed 1 is the worse outcome; the walk can follow that branch
+      (`throughFailedUntag`) and the test names each leave it reaches, so
+      the exception is held rather than hidden (review).
 - [ ] 5, in part: the new flows are under the banned-terms, phone-range and
       emergency-line checks like every other; PR 4 adds the kind ending of
       the prank path (`dare-goodbye` thanks the caller and invites them

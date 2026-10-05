@@ -512,8 +512,20 @@ function reachesTracking(
  * From a TagContact that sets `tagKey`, every path must reach an UntagContact
  * of that key or a DisconnectParticipant before it leaves the flow (a
  * transfer, a module, an end), so the tag never travels on a wrong guess.
+ *
+ * The walk stops at the UntagContact. Its own error branch is the one
+ * accepted way the tag can survive: a failed untag continues to classify
+ * and the transfers with the tag still set, because the alternative is to
+ * hang up on a caller who has just said it is really happening. With
+ * `throughFailedUntag` the walk follows that branch too and names each leave
+ * as reached after the failed untag, which is how the exception is held
+ * explicitly rather than hidden.
  */
-function tagPathProblems(d: FlowDoc, tagKey: string): string[] {
+function tagPathProblems(
+  d: FlowDoc,
+  tagKey: string,
+  options: { throughFailedUntag?: boolean } = {},
+): string[] {
   const byId = new Map(d.content.Actions.map((a) => [a.Identifier, a]));
   const leaves = new Set([
     "TransferToFlow",
@@ -528,31 +540,39 @@ function tagPathProblems(d: FlowDoc, tagKey: string): string[] {
   );
   for (const tag of tags) {
     const seen = new Set<string>();
-    const queue = [
-      tag.Transitions.NextAction,
-      ...(tag.Transitions.Errors ?? []).map((e) => e.NextAction),
+    // Each entry is a block id and, once past a failed untag, that untag's id.
+    const queue: [string | undefined, string | undefined][] = [
+      [tag.Transitions.NextAction, undefined],
+      ...(tag.Transitions.Errors ?? []).map((e): [string, undefined] => [e.NextAction, undefined]),
     ];
     while (queue.length > 0) {
-      const id = queue.shift();
-      if (id === undefined || seen.has(id)) continue;
-      seen.add(id);
+      const [id, via] = queue.shift() ?? [];
+      if (id === undefined || seen.has(`${via ?? ""}>${id}`)) continue;
+      seen.add(`${via ?? ""}>${id}`);
       const a = byId.get(id);
       if (a === undefined) continue;
-      if (a.Type === "UntagContact" && (a.Parameters.TagKeys as string[]).includes(tagKey))
+      if (a.Type === "UntagContact" && (a.Parameters.TagKeys as string[]).includes(tagKey)) {
+        if (options.throughFailedUntag === true) {
+          for (const e of a.Transitions.Errors ?? []) queue.push([e.NextAction, a.Identifier]);
+        }
         continue;
+      }
       if (a.Type === "DisconnectParticipant") continue;
       if (leaves.has(a.Type)) {
+        const after = via === undefined ? "" : ` after a failed ${via}`;
         out.push(
-          `${d.name}#${tag.Identifier}: ${tagKey} reaches ${a.Identifier} (${a.Type}) still set`,
+          `${d.name}#${tag.Identifier}: ${tagKey} reaches ${a.Identifier} (${a.Type}) still set${after}`,
         );
         continue;
       }
       const t = a.Transitions;
-      queue.push(
+      for (const to of [
         t.NextAction,
         ...(t.Conditions ?? []).map((c) => c.NextAction),
         ...(t.Errors ?? []).map((e) => e.NextAction),
-      );
+      ]) {
+        queue.push([to, via]);
+      }
     }
   }
   return out;
@@ -638,11 +658,28 @@ describe("the prank screen in hh-hotline-main", () => {
   });
 
   it.each(flows.map((l) => l.doc.name))(
-    "%s: every path through a screen tag untags it or ends the call",
+    "%s: every path through a screen tag untags it or ends the call, a failed untag excepted",
     (name) => {
       expect(tagPathProblems(doc(name), "screen")).toEqual([]);
     },
   );
+
+  // The accepted exception, held explicitly: if untag-screen itself fails,
+  // the caller who pressed 1 goes on to classify and the transfers with the
+  // tag still set, rather than being hung up on. Nothing else leaks it.
+  it("a failed untag-screen is the only way the tag leaves the flow, and it leaves set", () => {
+    expect(
+      (action(main, "untag-screen").Transitions.Errors ?? []).map((e) => e.NextAction),
+    ).toEqual(["classify"]);
+    expect(tagPathProblems(main, "screen", { throughFailedUntag: true }).sort()).toEqual([
+      "hh-hotline-main#tag-screen: screen reaches to-district-menu (TransferToFlow) still set after a failed untag-screen",
+      "hh-hotline-main#tag-screen: screen reaches transfer-to-dispatch (TransferContactToQueue) still set after a failed untag-screen",
+      "hh-hotline-main#tag-screen: screen reaches transfer-to-lantern (TransferContactToQueue) still set after a failed untag-screen",
+    ]);
+    for (const name of flows.map((l) => l.doc.name).filter((n) => n !== "hh-hotline-main")) {
+      expect(tagPathProblems(doc(name), "screen", { throughFailedUntag: true })).toEqual([]);
+    }
+  });
 });
 
 /** The dead line's shape, as a list of what is wrong with it (VERIFY 16.4, 16.5, 16.3). */
