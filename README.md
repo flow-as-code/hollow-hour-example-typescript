@@ -110,6 +110,106 @@ through the stub Lambdas and holds the scenario's asserts (grade 2, Restless,
 Mrs. Alder, old-town) to what they return. The live run against dev is an
 operator step (T1 criterion 10).
 
+## Scene 2: the Queue of the Dead
+
+Not every caller is a homeowner. A call from +1 413 555 0193, one of the ten
+numbers `lambda:plane-check` keeps for the departed
+([`lambdas/README.md`](lambdas/README.md)), is scenario S5
+([`scenarios/s5-departed-caller.scenario.json`](scenarios/s5-departed-caller.scenario.json)).
+The caller is nobody `lambda:caller-lookup` knows, hears the same safety
+question as everyone else, and is routed on the answer to one more Lambda:
+
+| Step                                            | The hotline                                                                                                                                                                       | The caller |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `hh-hotline-main`, before anything else         | "Hollow Hour Removal. Calls are recorded."                                                                                                                                        |            |
+| the greeting module (`module:greeting@live`)    | the brand line, and the emergency advice                                                                                                                                          |            |
+| `lambda:caller-lookup` does not know the number | no welcome back                                                                                                                                                                   |            |
+| the safety question                             | "Before anything else: is anyone hurt? ..."                                                                                                                                       | 2 (no)     |
+| `lambda:plane-check`                            | `plane` is `beyond`                                                                                                                                                               |            |
+| `hh-dead-line`, by TransferToFlow               | "You have reached the Hollow Hour line for the departed. Calls are recorded, but only our liaison's side, never yours. You are welcome here, and we are glad you called."         |            |
+| `record-agent-only`                             | recording on, for the liaison's side only (`["Agent"]`)                                                                                                                           |            |
+| four hooks, one block each                      | `hh-dead-whisper` for the liaison, `hh-dead-hold` and `hh-agent-hold` for the holds, `hh-dead-queue-experience` for the wait                                                      |            |
+| `note-beyond`                                   | district `beyond`, districtName `Beyond`, gradeName `Departed`                                                                                                                    |            |
+| `set-patience`                                  | `QueueTimeAdjustmentSeconds "-300"`: the living go first tonight                                                                                                                  |            |
+| `set-callback-number`                           | the caller's own number; if it cannot be dialed, "We cannot ring you back where you are, so stay on the line." and the call goes on                                               |            |
+| `check-dead-hours` on `hours:the-dead`          | the dead never close; both branches continue                                                                                                                                      |            |
+| `transfer-to-dead`                              | queued for `queue:the-dead`; if it is full, "The Queue of the Dead is full tonight, which is saying something. Call back after midnight; we will still be here, and so will you." |            |
+
+While they wait, `hh-dead-queue-experience` says "You are in the Queue of the
+Dead. A liaison will be with you; you have our word." and "The living go
+first tonight, but nobody here is forgotten." The liaison who picks up hears
+"Spectral liaison call. Be patient; they have waited a long time.", and a
+caller put on hold hears "Hold music is wasted on you, we know. Back
+shortly." The patience adjustment is a statement about routing, not a
+promise: a negative value makes the contact look newer than it is, so a
+contact competing for the same agents is served first
+([VERIFY.md, row 16.5](VERIFY.md#the-table)), and the dead have time.
+
+Offline, `tests/envScenarios.test.ts` replays S5 and `tests/flows.test.ts`
+holds the shape: the welcome before the recording block, the adjustment
+negative and static and set before the transfer, four hooks one per block,
+both callback-number errors wired, and no path that reaches the dead line
+without the safety question. The live run is an operator step at the tier's
+close (T2 criterion 8).
+
+### The prank screen
+
+Theo calls from +1 413 555 0166, a number `lambda:prank-score` keeps as a
+known dare; this is scenario S3
+([`scenarios/s3-theos-dare.scenario.json`](scenarios/s3-theos-dare.scenario.json)).
+He is welcomed back, says nobody is hurt, is among the living, and answers
+the six questions as Mrs. Alder did. Between the last question and the
+classifier:
+
+| Step                                         | The hotline                                                                                              | Theo |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---- |
+| `check-injured-first`                        | a caller who said someone is hurt skips the screen, whatever the score                                   |      |
+| `lambda:prank-score`, the answers and number | `verdict` is `high`                                                                                      |      |
+| `tag-screen`                                 | the contact is tagged `screen=prank-suspected`                                                           |      |
+| `kind-check`                                 | "Some calls are dares, and that is all right. If this is really happening, press 1. Otherwise, press 2." | 1    |
+| `untag-screen`                               | the tag is cleared; a wrong guess leaves no mark                                                         |      |
+| `lambda:classify-apparition`                 | "Thank you. From what you describe, this is a Restless case. ..." and the interview goes on as any other |      |
+
+A 2, a wrong key or silence hears "Thanks for keeping us on our toes. Call
+back any time something goes bump." and the call ends there, kindly. Theo
+pressed 1, so his call is graded like any other and opened as a work order
+(`open-work-order`, UpdateContactData, named "Hollow Hour work order" and
+described by the advice), which is how every graded call, his included, is
+found in contact search.
+
+### Callbacks
+
+Mrs. Alder again, on a night the Old Town crew is off shift: scenario S4
+([`scenarios/s4-after-hours-callback.scenario.json`](scenarios/s4-after-hours-callback.scenario.json))
+plays her S2 path with Old Town's hours substituted with `hours:closed`, an
+hours of operation open for one minute a week that exists for this scenario
+alone.
+
+| Step                                  | The hotline                                                                                                                                                                   | Mrs. Alder |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `hh-district-old-town`, `check-hours` | closed                                                                                                                                                                        |            |
+| `after-hours`                         | "The Old Town crew is off shift right now. Night crews start at 4 in the afternoon. If anyone is hurt or in danger, call your local emergency number (911 in the US)."        |            |
+| `offer-callback`                      | "We can call you back instead. For a callback, press 1. To end the call, press 2."                                                                                            | 1          |
+| `module:hh-offer-callback@live`       | her own number, then a callback in `queue:dispatch-overflow`, then "You are on the list. A crew will call you back as soon as one comes free. Keep the lights on until then." |            |
+
+A 2 or silence hears "All right. Keep the lights on, and call us again any
+time." The same module is offered when her crew and its overflow are both
+full, and never at `lines-busy`, which is reached exactly when
+dispatch-overflow itself is full. A caller already in a crew's queue who is
+told the wait is long gets the same offer inline from
+`hh-queue-experience-<slug>`, and a taken callback ends the call rather than
+the flow, so nobody is both queued and holding a callback. While she waits in
+a queue, `pick-hold-variant` sends half of all callers to the spoken hold
+tips and half to the one recorded prompt in the set
+(`prompt:salt-line-tips`), tagging each contact `holdVariant` so the A/B
+split is readable in contact search.
+
+The simulated S4 ends at the keypress: the module and the callback it creates
+are not events the harness observes, so whether a real callback is created
+is an open row ([VERIFY.md, row CB1](VERIFY.md#the-table)), and every S4 run
+on an instance is followed by the sweep in
+[`scenarios/README.md`](scenarios/README.md#after-an-s4-run).
+
 ## Three environments, compared
 
 What differs between the environments is the address maps, and so the
@@ -281,9 +381,11 @@ removing the instances and the state bucket as well takes the steps in
   environment, as an operator step, never in CI. Every scenario ends with
   EndTest.
 - Not simulatable, and documented rather than faked: queue metrics (the
-  overflow scenario), outbound campaigns, and the chat view. Every queue is
-  capped (two contacts in dev and qa), so an operator can fill one and hear
-  the overflow live.
+  overflow scenario), outbound campaigns, the chat view, the hold flows (an
+  agent has to place the hold) and which side of the hold A/B split a run
+  takes ([`scenarios/README.md`](scenarios/README.md#what-can-be-simulated)).
+  Every queue is capped (two contacts in dev and qa), so an operator can
+  fill one and hear the overflow live.
 - Lex is a stretch goal. The keypad interview is the baseline.
 - There is no live public hotline.
 
@@ -293,13 +395,13 @@ instance yet.
 
 ## Tiers and status
 
-| Tier | Name          | Scope                                                                                                                                                        | Status                                                                                                           |
-| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| T0   | Scaffold      | Layout, toolchain, CI, environment roots, reference manifest, VERIFY.md                                                                                      | done; owner setup open                                                                                           |
-| T1   | First night   | Main line with keypad triage and interview, generated district and queue flows, whispers, seasonal greetings, supporting resources in all three environments | live in dev, qa and prod, all in us-east-1 (2026-09-30); qa S2 waits on a quota increase                         |
-| T2   | Full moon     | Holds, the Queue of the Dead, prank screen, work orders, callbacks, a hold A/B test with a recorded prompt, the address module (when flow-as-code C04 ships) | planned 2026-10-04 ([T2](tasks/T2-full-moon.md)); not started                                                    |
-| T3   | Witching hour | Bo as an agent, transfers to him and the Lantern Crew, the outbound whisper, the chat field guide, Lex if gated in, the drift-and-adopt scene                | planned 2026-10-04 ([T3](tasks/T3-witching-hour.md)); after the season; its chat flow waits for flow-as-code C11 |
-| T4   | Full coverage | Every documented action type flow-as-code Phase D models, used here or recorded as deploy-only or not coverable with the reason                              | planned 2026-10-04 ([T4](tasks/T4-full-coverage.md)); follows Phase D releases                                   |
+| Tier | Name          | Scope                                                                                                                                                        | Status                                                                                                                                                                                      |
+| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T0   | Scaffold      | Layout, toolchain, CI, environment roots, reference manifest, VERIFY.md                                                                                      | done; owner setup open                                                                                                                                                                      |
+| T1   | First night   | Main line with keypad triage and interview, generated district and queue flows, whispers, seasonal greetings, supporting resources in all three environments | live in dev, qa and prod, all in us-east-1 (2026-09-30); qa S2 waits on a quota increase                                                                                                    |
+| T2   | Full moon     | Holds, the Queue of the Dead, prank screen, work orders, callbacks, a hold A/B test with a recorded prompt, the address module (when flow-as-code C04 ships) | built; live apply pending (2026-10-05): PRs 1 to 7 merged, the close is the checklist in [T2](tasks/T2-full-moon.md); the address module waits on the flow-as-code release that carries C04 |
+| T3   | Witching hour | Bo as an agent, transfers to him and the Lantern Crew, the outbound whisper, the chat field guide, Lex if gated in, the drift-and-adopt scene                | planned 2026-10-04 ([T3](tasks/T3-witching-hour.md)); after the season; its chat flow waits for flow-as-code C11                                                                            |
+| T4   | Full coverage | Every documented action type flow-as-code Phase D models, used here or recorded as deploy-only or not coverable with the reason                              | planned 2026-10-04 ([T4](tasks/T4-full-coverage.md)); follows Phase D releases                                                                                                              |
 
 Each tier's acceptance criteria are in [`tasks/`](tasks/).
 

@@ -13,7 +13,10 @@ directory is the record of how anything got the way it is.
 | T3  | Witching hour | 3    | [T3-witching-hour.md](T3-witching-hour.md) |
 | T4  | Full coverage | 4    | [T4-full-coverage.md](T4-full-coverage.md) |
 
-T2 to T4 were planned on 2026-10-04 and are not started. T3 starts after the
+T2 to T4 were planned on 2026-10-04. T2 is built: its PRs 1 to 7 merged on
+2026-10-05 and it waits on its live close, the checklist in its file (PR 8,
+the address module, waits on the flow-as-code release that carries C04). T3
+and T4 are not started. T3 starts after the
 season; only its chat-flow PR waits for the flow-as-code release that
 carries C03 (C11). T4 follows flow-as-code's Phase D release (D10). Each file carries a "Terraform-first" section with what
 [hollow-hour-example-terraform](https://github.com/flow-as-code/hollow-hour-example-terraform)
