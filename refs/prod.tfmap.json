@@ -1,4 +1,5 @@
 {
+  "hours:closed": "aws_connect_hours_of_operation.closed.arn",
   "hours:graveyard-hill": "aws_connect_hours_of_operation.night_shift.arn",
   "hours:harborside": "aws_connect_hours_of_operation.night_shift.arn",
   "hours:old-town": "aws_connect_hours_of_operation.night_shift.arn",

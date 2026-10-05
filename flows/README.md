@@ -11,6 +11,10 @@ The emitted flow set: every in-set FlowDoc (`<name>.flowdoc.json`) and its
 | `hh-agent-whisper`           | AGENT_WHISPER    | hand-authored                      |
 | `hh-customer-hold`           | CUSTOMER_HOLD    | hand-authored                      |
 | `hh-agent-hold`              | AGENT_HOLD       | hand-authored                      |
+| `hh-dead-line`               | CONTACT_FLOW     | hand-authored                      |
+| `hh-dead-whisper`            | AGENT_WHISPER    | hand-authored                      |
+| `hh-dead-hold`               | CUSTOMER_HOLD    | hand-authored                      |
+| `hh-dead-queue-experience`   | CUSTOMER_QUEUE   | hand-authored                      |
 | `hh-district-menu`           | CONTACT_FLOW     | `npm run generate` (`generators/`) |
 | `hh-district-<slug>`         | CONTACT_FLOW     | `npm run generate` (`generators/`) |
 | `hh-queue-experience-<slug>` | CUSTOMER_QUEUE   | `npm run generate` (`generators/`) |
@@ -39,6 +43,17 @@ fallback, the Lantern Crew chain in `hh-hotline-main`), one hook per block
 hold. They never run under the simulate harness, which ends every test
 before an agent; their evidence is the create and `tests/flows.test.ts`.
 
+`hh-dead-line` is the Queue of the Dead, reached from `hh-hotline-main` when
+`lambda:plane-check` answers `beyond` (the numbers 555-0190 to 555-0199, or a
+caller who says so), always after the safety question. It plays its welcome
+before `record-agent-only`, which records the living liaison only
+(`["Agent"]`, no error branch, VERIFY.md 16.4), sets its four hooks one per
+block (16.3), sets the dead's patience (`QueueTimeAdjustmentSeconds "-300"`,
+static, before the transfer: the living go first tonight, 16.5), sets the
+callback number from the caller's own with both errors wired (6.2), checks
+`hours:the-dead` (both branches continue) and transfers to `queue:the-dead`
+with QueueAtCapacity wired.
+
 ## What the flows read and write
 
 Lambda responses, read as `$.External.<key>`. Every invocation uses `JSON`
@@ -51,6 +66,7 @@ with spaces and punctuation and validation covers the whole response
 | `lambda:caller-lookup`       | the contact (no parameters)                                                                           | `status` (`known`, `account`, anything else is new), `callerName` |
 | `lambda:classify-apparition` | `canSee`, `movesObjects`, `coldSpot`, `sounds`, `touched`, `multiple`, `injured`, each `yes` or `no` | `grade` (`1` to `5`), `gradeName`, `advice`, `safety`, `crewQueue` |
 | `lambda:crew-eta`            | `district` (the slug)                                                                                 | `etaMinutes`                                                    |
+| `lambda:plane-check`         | the contact (no parameters; it reads the caller's number)                                             | `plane` (`living`, `beyond`), `reason`                          |
 
 Contact attributes, which reach whispers and later flows (flow attributes do
 not):
@@ -59,8 +75,8 @@ not):
 | ------------------------------ | --------------------------------------- | ------------------------------------ |
 | `season`                       | the greeting module                     | `hh-hotline-main` (the `season` tag) |
 | `callerName`, `callerStatus`   | `hh-hotline-main`                       | `hh-hotline-main` (welcome back)     |
-| `grade`, `gradeName`, `advice` | `hh-hotline-main` (from the classifier; `gradeName` is `Ungraded` on the dispatch fallback from a failed classification) | `hh-hotline-main`, `hh-agent-whisper`, `hh-agent-hold` |
-| `district`, `districtName`     | `hh-district-menu`; rewritten by `hh-district-<slug>` before an overflow, by `hh-queue-experience-<slug>` before a move, and by `hh-hotline-main` for the Lantern Crew and dispatch | both whispers, `hh-customer-hold`, the queue flows' copy |
+| `grade`, `gradeName`, `advice` | `hh-hotline-main` (from the classifier; `gradeName` is `Ungraded` on the dispatch fallback from a failed classification); `gradeName` is `Departed` from `hh-dead-line` | `hh-hotline-main`, `hh-agent-whisper`, `hh-agent-hold` |
+| `district`, `districtName`     | `hh-district-menu`; rewritten by `hh-district-<slug>` before an overflow, by `hh-queue-experience-<slug>` before a move, by `hh-hotline-main` for the Lantern Crew and dispatch, and by `hh-dead-line` (`beyond`, `Beyond`) | both whispers, `hh-customer-hold`, the queue flows' copy |
 | `moved`                        | `hh-queue-experience-<slug>` (`true` before a move, `false` if it fails) | `hh-queue-experience-<slug>` (skips the offer) |
 
 The interview answers are flow attributes of `hh-hotline-main`, passed to the

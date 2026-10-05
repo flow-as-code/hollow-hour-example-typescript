@@ -1,0 +1,123 @@
+{
+  "flowdoc": "0.2",
+  "kind": "flow",
+  "name": "hh-dead-queue-experience",
+  "description": "The Queue of the Dead: what a departed caller hears in queue. A loop of reassurance that polls a few times, then settles. No dequeue: there is no other queue for them.",
+  "connectType": "CUSTOMER_QUEUE",
+  "content": {
+    "Version": "2019-10-30",
+    "StartAction": "keep-vigil",
+    "Actions": [
+      {
+        "Identifier": "keep-vigil",
+        "Type": "Loop",
+        "Parameters": {
+          "LoopCount": "3"
+        },
+        "Transitions": {
+          "NextAction": "settle-in",
+          "Errors": [],
+          "Conditions": [
+            {
+              "NextAction": "reassure",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "ContinueLooping"
+                ]
+              }
+            },
+            {
+              "NextAction": "settle-in",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "DoneLooping"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "reassure",
+        "Type": "MessageParticipantIteratively",
+        "Parameters": {
+          "InterruptFrequencySeconds": "30",
+          "Messages": [
+            {
+              "Text": "You are in the Queue of the Dead. A liaison will be with you; you have our word."
+            },
+            {
+              "Text": "The living go first tonight, but nobody here is forgotten."
+            }
+          ]
+        },
+        "Transitions": {
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "done"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "keep-vigil",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "MessagesInterrupted"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "settle-in",
+        "Type": "MessageParticipantIteratively",
+        "Parameters": {
+          "Messages": [
+            {
+              "Text": "Still with you. Rest if you can; the liaison knows you are waiting."
+            }
+          ]
+        },
+        "Transitions": {
+          "Errors": [],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "done",
+        "Type": "EndFlowExecution",
+        "Parameters": {},
+        "Transitions": {}
+      }
+    ]
+  },
+  "layout": {
+    "done": {
+      "x": 540,
+      "y": 20
+    },
+    "keep-vigil": {
+      "x": 20,
+      "y": 20
+    },
+    "reassure": {
+      "x": 280,
+      "y": 120
+    },
+    "settle-in": {
+      "x": 280,
+      "y": 20
+    }
+  },
+  "refs": [],
+  "meta": {
+    "generator": "cli@0.2.1",
+    "sourceHash": "sha256:5115622d4ec5e3fd6305944a32228dffd0ca07991edd2ede232f3e879e581fbf",
+    "sourceKind": "ts"
+  }
+}

@@ -250,7 +250,7 @@
               }
             },
             {
-              "NextAction": "start-interview",
+              "NextAction": "plane-check",
               "Condition": {
                 "Operator": "Equals",
                 "Operands": [
@@ -259,6 +259,72 @@
               }
             }
           ]
+        }
+      },
+      {
+        "Identifier": "plane-check",
+        "Type": "InvokeLambdaFunction",
+        "Parameters": {
+          "InvocationTimeLimitSeconds": 4,
+          "InvocationType": "SYNCHRONOUS",
+          "LambdaFunctionARN": "${cdref:lambda:plane-check}",
+          "ResponseValidation": {
+            "ResponseType": "JSON"
+          }
+        },
+        "Transitions": {
+          "NextAction": "check-plane",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "start-interview"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "check-plane",
+        "Type": "Compare",
+        "Parameters": {
+          "ComparisonValue": "$.External.plane"
+        },
+        "Transitions": {
+          "NextAction": "start-interview",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "start-interview"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "to-dead-line",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "beyond"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "to-dead-line",
+        "Type": "TransferToFlow",
+        "Parameters": {
+          "ContactFlowId": "${cdref:flow:hh-dead-line}"
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "start-interview"
+            }
+          ],
+          "Conditions": []
         }
       },
       {
@@ -1351,7 +1417,7 @@
   },
   "layout": {
     "apologize": {
-      "x": 11980,
+      "x": 12240,
       "y": 120
     },
     "ask-anyone-hurt": {
@@ -1359,27 +1425,27 @@
       "y": 20
     },
     "ask-can-see": {
-      "x": 3660,
+      "x": 3920,
       "y": 20
     },
     "ask-cold-spot": {
-      "x": 4700,
+      "x": 4960,
       "y": 20
     },
     "ask-moves-objects": {
-      "x": 4180,
+      "x": 4440,
       "y": 20
     },
     "ask-multiple": {
-      "x": 6260,
+      "x": 6520,
       "y": 20
     },
     "ask-sounds": {
-      "x": 5220,
+      "x": 5480,
       "y": 20
     },
     "ask-touched": {
-      "x": 5740,
+      "x": 6000,
       "y": 20
     },
     "check-caller": {
@@ -1387,11 +1453,15 @@
       "y": 20
     },
     "check-grade": {
-      "x": 7560,
+      "x": 7820,
       "y": 20
     },
+    "check-plane": {
+      "x": 3140,
+      "y": 120
+    },
     "classify": {
-      "x": 6780,
+      "x": 7040,
       "y": 20
     },
     "emergency-advice": {
@@ -1407,15 +1477,15 @@
       "y": 120
     },
     "hand-to-dispatch": {
-      "x": 9900,
+      "x": 10160,
       "y": 20
     },
     "hang-up": {
-      "x": 12240,
+      "x": 12500,
       "y": 20
     },
     "lines-busy": {
-      "x": 11980,
+      "x": 12240,
       "y": 20
     },
     "look-up-caller": {
@@ -1423,15 +1493,15 @@
       "y": 20
     },
     "note-can-see": {
-      "x": 3920,
+      "x": 4180,
       "y": 20
     },
     "note-cold-spot": {
-      "x": 4960,
+      "x": 5220,
       "y": 20
     },
     "note-dispatch": {
-      "x": 10160,
+      "x": 10420,
       "y": 20
     },
     "note-injury": {
@@ -1439,39 +1509,43 @@
       "y": 120
     },
     "note-lantern": {
-      "x": 8080,
+      "x": 8340,
       "y": 20
     },
     "note-moves-objects": {
-      "x": 4440,
+      "x": 4700,
       "y": 20
     },
     "note-multiple": {
-      "x": 6520,
+      "x": 6780,
       "y": 20
     },
     "note-sounds": {
-      "x": 5480,
+      "x": 5740,
       "y": 20
     },
     "note-touched": {
-      "x": 6000,
+      "x": 6260,
       "y": 20
     },
     "note-ungraded": {
-      "x": 7300,
+      "x": 7560,
       "y": 120
     },
     "offer-end-or-continue": {
       "x": 3140,
       "y": 20
     },
+    "plane-check": {
+      "x": 2880,
+      "y": 120
+    },
     "play-greeting": {
       "x": 1060,
       "y": 20
     },
     "record-grade": {
-      "x": 7040,
+      "x": 7300,
       "y": 20
     },
     "recording-notice": {
@@ -1487,47 +1561,47 @@
       "y": 20
     },
     "send-to-lantern-crew": {
-      "x": 7820,
+      "x": 8080,
       "y": 120
     },
     "set-dispatch-agent-hold": {
-      "x": 11200,
-      "y": 20
-    },
-    "set-dispatch-agent-whisper": {
-      "x": 10680,
-      "y": 20
-    },
-    "set-dispatch-customer-hold": {
-      "x": 10940,
-      "y": 20
-    },
-    "set-dispatch-customer-whisper": {
-      "x": 10420,
-      "y": 20
-    },
-    "set-dispatch-queue": {
       "x": 11460,
       "y": 20
     },
+    "set-dispatch-agent-whisper": {
+      "x": 10940,
+      "y": 20
+    },
+    "set-dispatch-customer-hold": {
+      "x": 11200,
+      "y": 20
+    },
+    "set-dispatch-customer-whisper": {
+      "x": 10680,
+      "y": 20
+    },
+    "set-dispatch-queue": {
+      "x": 11720,
+      "y": 20
+    },
     "set-lantern-agent-hold": {
-      "x": 9120,
+      "x": 9380,
       "y": 20
     },
     "set-lantern-agent-whisper": {
-      "x": 8600,
-      "y": 20
-    },
-    "set-lantern-customer-hold": {
       "x": 8860,
       "y": 20
     },
+    "set-lantern-customer-hold": {
+      "x": 9120,
+      "y": 20
+    },
     "set-lantern-customer-whisper": {
-      "x": 8340,
+      "x": 8600,
       "y": 20
     },
     "set-lantern-queue": {
-      "x": 9380,
+      "x": 9640,
       "y": 20
     },
     "set-voice": {
@@ -1535,12 +1609,12 @@
       "y": 20
     },
     "share-advice": {
-      "x": 7300,
+      "x": 7560,
       "y": 20
     },
     "start-interview": {
-      "x": 2880,
-      "y": 120
+      "x": 3660,
+      "y": 20
     },
     "start-recording": {
       "x": 800,
@@ -1550,16 +1624,20 @@
       "x": 1320,
       "y": 20
     },
+    "to-dead-line": {
+      "x": 3400,
+      "y": 220
+    },
     "to-district-menu": {
-      "x": 7820,
+      "x": 8080,
       "y": 20
     },
     "transfer-to-dispatch": {
-      "x": 11720,
+      "x": 11980,
       "y": 20
     },
     "transfer-to-lantern": {
-      "x": 9640,
+      "x": 9900,
       "y": 20
     },
     "welcome-back": {
@@ -1589,6 +1667,11 @@
       "name": "hh-customer-whisper"
     },
     {
+      "token": "${cdref:flow:hh-dead-line}",
+      "type": "flow",
+      "name": "hh-dead-line"
+    },
+    {
       "token": "${cdref:flow:hh-district-menu}",
       "type": "flow",
       "name": "hh-district-menu"
@@ -1602,6 +1685,11 @@
       "token": "${cdref:lambda:classify-apparition}",
       "type": "lambda",
       "name": "classify-apparition"
+    },
+    {
+      "token": "${cdref:lambda:plane-check}",
+      "type": "lambda",
+      "name": "plane-check"
     },
     {
       "token": "${cdref:module:greeting@live}",
@@ -1622,7 +1710,7 @@
   ],
   "meta": {
     "generator": "cli@0.2.1",
-    "sourceHash": "sha256:84124f9efe438876115f5d1506a6111fbbbfd7d911c9ed031d9f020f4743dd5a",
+    "sourceHash": "sha256:0e0cf401f5ae98a46ebeae5167bb3eb79973d48eaf619de18bfcdee78a63c4df",
     "sourceKind": "ts"
   }
 }

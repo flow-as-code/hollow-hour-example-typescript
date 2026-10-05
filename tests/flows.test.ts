@@ -50,6 +50,10 @@ describe("lint", () => {
       "hh-agent-whisper",
       "hh-customer-hold",
       "hh-agent-hold",
+      "hh-dead-line",
+      "hh-dead-whisper",
+      "hh-dead-hold",
+      "hh-dead-queue-experience",
       "hh-greeting-standard",
       "hh-greeting-halloween",
       "hh-district-menu",
@@ -152,12 +156,10 @@ describe("names and references", () => {
   // and naming the gate that will use it. A listed key a flow does use fails
   // too, so the list cannot go stale.
   const UNUSED_UNTIL: Record<string, { gate: string; since: string }> = {
-    "queue:the-dead": { gate: "T2 PR 3, hh-dead-line", since: "2026-10-05" },
-    "lambda:plane-check": { gate: "T2 PR 3, plane-check in hh-hotline-main", since: "2026-10-05" },
-    "flow:hh-dead-line": { gate: "T2 PR 3, hh-hotline-main", since: "2026-10-05" },
-    "flow:hh-dead-whisper": { gate: "T2 PR 3, hh-dead-line", since: "2026-10-05" },
-    "flow:hh-dead-hold": { gate: "T2 PR 3, hh-dead-line", since: "2026-10-05" },
-    "flow:hh-dead-queue-experience": { gate: "T2 PR 3, hh-dead-line", since: "2026-10-05" },
+    "hours:closed": {
+      gate: "T2 PR 6, S4 substitutes it for a district's hours",
+      since: "2026-10-05",
+    },
     "lambda:prank-score": { gate: "T2 PR 4, the prank screen", since: "2026-10-05" },
     "module:hh-offer-callback": { gate: "T2 PR 6, callbacks", since: "2026-10-05" },
     "prompt:salt-line-tips": {
@@ -274,7 +276,7 @@ describe("hh-hotline-main", () => {
     const conditions = hurt.Transitions.Conditions ?? [];
     expect(conditions.map((c) => [c.Condition.Operands[0], c.NextAction])).toEqual([
       ["1", "emergency-advice"],
-      ["2", "start-interview"],
+      ["2", "plane-check"],
     ]);
     const offer = action(main, "offer-end-or-continue");
     const targets = new Set([
@@ -375,7 +377,7 @@ describe("hh-hotline-main", () => {
   });
 
   it("invokes its Lambdas with JSON response validation (VERIFY L1)", () => {
-    for (const id of ["look-up-caller", "classify"]) {
+    for (const id of ["look-up-caller", "plane-check", "classify"]) {
       expect(action(main, id).Parameters.ResponseValidation).toEqual({ ResponseType: "JSON" });
     }
   });
@@ -392,6 +394,302 @@ describe("hh-hotline-main", () => {
       ).map((a) => `${l.doc.name}#${a.Identifier}`),
     );
     expect(stringMap).toEqual([]);
+  });
+});
+
+/** Whether `target` is reachable from `from` on a path that never passes `avoid`. */
+function reachesWithout(d: FlowDoc, from: string, target: string, avoid: string): boolean {
+  const byId = new Map(d.content.Actions.map((a) => [a.Identifier, a]));
+  const seen = new Set<string>();
+  const queue = [from];
+  while (queue.length > 0) {
+    const id = queue.shift() ?? "";
+    if (id === target) return true;
+    if (seen.has(id) || id === avoid) continue;
+    seen.add(id);
+    const t = byId.get(id)?.Transitions;
+    if (t === undefined) continue;
+    queue.push(
+      ...[
+        t.NextAction,
+        ...(t.Conditions ?? []).map((c) => c.NextAction),
+        ...(t.Errors ?? []).map((e) => e.NextAction),
+      ].filter((x): x is string => x !== undefined),
+    );
+  }
+  return false;
+}
+
+describe("the plane check in hh-hotline-main", () => {
+  const main = doc("hh-hotline-main");
+
+  it("runs after the safety question says nobody is hurt, and sends beyond to the dead line", () => {
+    const hurt = action(main, "ask-anyone-hurt");
+    expect(
+      hurt.Transitions.Conditions?.find((c) => c.Condition.Operands[0] === "2")?.NextAction,
+    ).toBe("plane-check");
+    const check = action(main, "plane-check");
+    expect(check.Parameters.LambdaFunctionARN).toBe("${cdref:lambda:plane-check}");
+    expect(check.Transitions.NextAction).toBe("check-plane");
+    const compare = action(main, "check-plane");
+    expect(compare.Parameters.ComparisonValue).toBe("$.External.plane");
+    expect(compare.Transitions.Conditions).toEqual([
+      { NextAction: "to-dead-line", Condition: { Operator: "Equals", Operands: ["beyond"] } },
+    ]);
+    expect(compare.Transitions.NextAction).toBe("start-interview");
+    expect(action(main, "to-dead-line").Parameters.ContactFlowId).toBe(
+      "${cdref:flow:hh-dead-line}",
+    );
+  });
+
+  it("would notice a path to the dead line that skips the safety question", () => {
+    const skipped = structuredClone(main);
+    action(skipped, "welcome-back").Transitions.NextAction = "plane-check";
+    expect(
+      reachesWithout(skipped, skipped.content.StartAction, "to-dead-line", "ask-anyone-hurt"),
+    ).toBe(true);
+  });
+
+  it("never skips the safety question: no path reaches the dead line without it", () => {
+    expect(reachesWithout(main, main.content.StartAction, "to-dead-line", "ask-anyone-hurt")).toBe(
+      false,
+    );
+    // And the dead line is reachable at all.
+    expect(reachesWithout(main, main.content.StartAction, "to-dead-line", "")).toBe(true);
+  });
+});
+
+/** The dead line's shape, as a list of what is wrong with it (VERIFY 16.4, 16.5, 16.3). */
+function deadLineProblems(d: FlowDoc): string[] {
+  const out: string[] = [];
+  const find = (id: string) => d.content.Actions.find((a) => a.Identifier === id);
+  const welcome = find("dead-welcome");
+  const rec = find("record-agent-only");
+  if (d.content.StartAction !== "dead-welcome") out.push("does not start with the welcome");
+  if (welcome?.Type !== "MessageParticipant" || !/recorded/.test(String(welcome.Parameters.Text))) {
+    out.push("the welcome does not say the call is recorded");
+  }
+  if (welcome?.Transitions.NextAction !== "record-agent-only") {
+    out.push("the welcome does not lead to the recording block");
+  }
+  if (rec?.Type !== "UpdateContactRecordingBehavior") out.push("no UpdateContactRecordingBehavior");
+  const recorded = (
+    rec?.Parameters.RecordingBehavior as { RecordedParticipants?: string[] } | undefined
+  )?.RecordedParticipants;
+  if (JSON.stringify(recorded) !== JSON.stringify(["Agent"])) {
+    out.push("the recording block does not record exactly the Agent");
+  }
+  if ((rec?.Transitions.Errors ?? []).length > 0)
+    out.push("the recording block has an error branch");
+  if (reachesWithout(d, d.content.StartAction, "record-agent-only", "dead-welcome")) {
+    out.push("recording is reachable without the welcome");
+  }
+  const patience = find("set-patience");
+  const adjust = String(patience?.Parameters.QueueTimeAdjustmentSeconds);
+  if (patience?.Type !== "UpdateContactRoutingBehavior")
+    out.push("no UpdateContactRoutingBehavior");
+  if (!/^-\d+$/.test(adjust))
+    out.push(`the routing adjustment is ${adjust}, not a static negative`);
+  if (patience?.Parameters.QueuePriority !== undefined)
+    out.push("the routing adjustment also sets a priority");
+  if (reachesWithout(d, d.content.StartAction, "transfer-to-dead", "set-patience")) {
+    out.push("the transfer is reachable without the routing adjustment");
+  }
+  if (reachesWithout(d, d.content.StartAction, "set-dead-queue", "set-patience")) {
+    out.push("the target queue is set before the routing adjustment");
+  }
+  const hooks = d.content.Actions.filter((a) => a.Type === "UpdateContactEventHooks");
+  const set = Object.assign({}, ...hooks.map((a) => a.Parameters.EventHooks)) as Record<
+    string,
+    string
+  >;
+  for (const a of hooks) {
+    if (Object.keys(a.Parameters.EventHooks as object).length !== 1)
+      out.push(`${a.Identifier} sets more than one hook`);
+  }
+  const expected: Record<string, string> = {
+    AgentWhisper: "${cdref:flow:hh-dead-whisper}",
+    CustomerHold: "${cdref:flow:hh-dead-hold}",
+    CustomerQueue: "${cdref:flow:hh-dead-queue-experience}",
+    AgentHold: "${cdref:flow:hh-agent-hold}",
+  };
+  for (const [hook, flow] of Object.entries(expected)) {
+    if (set[hook] !== flow) out.push(`${hook} is ${String(set[hook])}, expected ${flow}`);
+  }
+  if (!reachesWithout(d, d.content.StartAction, "transfer-to-dead", ""))
+    out.push("the transfer is unreachable");
+  return out;
+}
+
+describe("hh-dead-line", () => {
+  const dead = doc("hh-dead-line");
+
+  it("has the shape the design settled: welcome, agent-only recording, hooks, patience, transfer", () => {
+    expect(deadLineProblems(dead)).toEqual([]);
+    expect(action(dead, "set-dead-queue").Parameters.QueueId).toBe("${cdref:queue:the-dead}");
+    const transfer = action(dead, "transfer-to-dead");
+    expect((transfer.Transitions.Errors ?? []).map((e) => e.ErrorType).sort()).toEqual([
+      "NoMatchingError",
+      "QueueAtCapacity",
+    ]);
+    expect(action(dead, "check-dead-hours").Parameters.HoursOfOperationId).toBe(
+      "${cdref:hours:the-dead}",
+    );
+  });
+
+  it("the dead never close: both hours branches continue to the queue", () => {
+    const hours = action(dead, "check-dead-hours");
+    expect(new Set((hours.Transitions.Conditions ?? []).map((c) => c.NextAction))).toEqual(
+      new Set(["set-dead-queue"]),
+    );
+  });
+
+  it("catches the welcome after the recording, a customer in the recording, and an error branch", () => {
+    const swapped = structuredClone(dead);
+    swapped.content.StartAction = "record-agent-only";
+    action(swapped, "record-agent-only").Transitions.NextAction = "dead-welcome";
+    action(swapped, "dead-welcome").Transitions.NextAction = "set-dead-whisper";
+    expect(deadLineProblems(swapped)).toContain("does not start with the welcome");
+    expect(deadLineProblems(swapped)).toContain("recording is reachable without the welcome");
+    const both = structuredClone(dead);
+    action(both, "record-agent-only").Parameters.RecordingBehavior = {
+      RecordedParticipants: ["Agent", "Customer"],
+    };
+    action(both, "record-agent-only").Transitions.Errors = [
+      { ErrorType: "NoMatchingError", NextAction: "set-dead-whisper" },
+    ];
+    expect(deadLineProblems(both)).toEqual([
+      "the recording block does not record exactly the Agent",
+      "the recording block has an error branch",
+    ]);
+  });
+
+  it("catches a positive, dynamic or late routing adjustment", () => {
+    const positive = structuredClone(dead);
+    action(positive, "set-patience").Parameters.QueueTimeAdjustmentSeconds = "300";
+    expect(deadLineProblems(positive)).toEqual([
+      "the routing adjustment is 300, not a static negative",
+    ]);
+    const dynamic = structuredClone(dead);
+    action(dynamic, "set-patience").Parameters.QueueTimeAdjustmentSeconds = "$.Attributes.patience";
+    expect(deadLineProblems(dynamic)).toHaveLength(1);
+    const late = structuredClone(dead);
+    action(late, "note-beyond").Transitions.NextAction = "set-callback-number";
+    expect(deadLineProblems(late)).toEqual([
+      "the transfer is reachable without the routing adjustment",
+      "the target queue is set before the routing adjustment",
+    ]);
+  });
+
+  it("catches a missing or doubled hook", () => {
+    const missing = structuredClone(dead);
+    action(missing, "set-dead-whisper").Transitions.NextAction = "set-dead-queue-experience";
+    expect(deadLineProblems(missing)).toEqual([]);
+    missing.content.Actions = missing.content.Actions.filter(
+      (a) => a.Identifier !== "set-dead-hold",
+    );
+    expect(deadLineProblems(missing)).toEqual([
+      "CustomerHold is undefined, expected ${cdref:flow:hh-dead-hold}",
+    ]);
+    const doubled = structuredClone(dead);
+    (action(doubled, "set-dead-hold").Parameters.EventHooks as Record<string, string>).AgentHold =
+      "${cdref:flow:hh-agent-hold}";
+    expect(deadLineProblems(doubled)).toEqual(["set-dead-hold sets more than one hook"]);
+  });
+});
+
+describe("hooked flows never point back", () => {
+  const hookTargets = (d: FlowDoc) =>
+    d.content.Actions.filter((a) => a.Type === "UpdateContactEventHooks").flatMap((a) =>
+      Object.values(a.Parameters.EventHooks as Record<string, string>).map((flow) => ({
+        block: a.Identifier,
+        flow: /^\$\{cdref:flow:(.+)\}$/.exec(flow)?.[1] ?? flow,
+      })),
+    );
+  const problems = (d: FlowDoc) =>
+    hookTargets(d).flatMap(({ block, flow }) => {
+      if (flow === d.name) return [`${d.name}#${block}: hooks itself`];
+      const target = byName.get(flow);
+      if (target === undefined)
+        return [`${d.name}#${block}: hooks ${flow}, which is not in the set`];
+      const back = collectRefs(target.content).some((r) => r.type === "flow" && r.name === d.name);
+      return back ? [`${d.name}#${block}: hooks ${flow}, which references ${d.name} back`] : [];
+    });
+
+  it("would notice a hook that points back, so the check means something", () => {
+    const d = structuredClone(doc("hh-dead-line"));
+    (action(d, "set-dead-whisper").Parameters.EventHooks as Record<string, string>).AgentWhisper =
+      "${cdref:flow:hh-dead-line}";
+    expect(problems(d)).toEqual(["hh-dead-line#set-dead-whisper: hooks itself"]);
+  });
+
+  it.each(flows.map((l) => l.doc.name))("%s", (name) => {
+    expect(problems(doc(name))).toEqual([]);
+  });
+});
+
+describe("the callback number", () => {
+  const setters = flows.flatMap((l) =>
+    l.doc.content.Actions.filter((a) => a.Type === "UpdateContactCallbackNumber").map((a) => ({
+      where: `${l.doc.name}#${a.Identifier}`,
+      a,
+    })),
+  );
+  const problems = (where: string, a: FlowAction) => {
+    const out: string[] = [];
+    if (a.Parameters.CallbackNumber !== "$.CustomerEndpoint.Address") {
+      out.push(`${where}: number is ${String(a.Parameters.CallbackNumber)}, not the caller's`);
+    }
+    const errors = (a.Transitions.Errors ?? []).map((e) => e.ErrorType);
+    for (const e of ["CallbackNumberNotDialable", "InvalidCallbackNumber"]) {
+      if (!errors.includes(e)) out.push(`${where}: ${e} is not wired`);
+    }
+    return out;
+  };
+
+  it("is set somewhere, and the check catches a static number or a missing error", () => {
+    expect(setters.map((s) => s.where)).toContain("hh-dead-line#set-callback-number");
+    const first = setters[0];
+    if (first === undefined) throw new Error("no UpdateContactCallbackNumber");
+    const broken = structuredClone(first.a);
+    broken.Parameters.CallbackNumber = "+14135550100";
+    broken.Transitions.Errors = (broken.Transitions.Errors ?? []).slice(0, 1);
+    expect(problems(first.where, broken)).toHaveLength(2);
+  });
+
+  it.each(setters.map((s) => [s.where, s.a] as const))(
+    "%s reads the caller's number and wires both errors (VERIFY 6.2)",
+    (where, a) => {
+      expect(problems(where, a)).toEqual([]);
+    },
+  );
+
+  it("in the dead line, both errors say so and rejoin the hours check", () => {
+    const d = doc("hh-dead-line");
+    const a = action(d, "set-callback-number");
+    for (const e of a.Transitions.Errors ?? []) expect(e.NextAction).toBe("cannot-ring-back");
+    expect(action(d, "cannot-ring-back").Parameters.Text).toContain("stay on the line");
+    expect(action(d, "cannot-ring-back").Transitions.NextAction).toBe(a.Transitions.NextAction);
+  });
+});
+
+describe("hh-dead-queue-experience", () => {
+  const q = doc("hh-dead-queue-experience");
+
+  it("is a customer queue flow with a Loop and a loop of prompts, and no dequeue", () => {
+    expect(q.connectType).toBe("CUSTOMER_QUEUE");
+    const t = types(q);
+    expect(t.has("Loop")).toBe(true);
+    expect(t.has("MessageParticipantIteratively")).toBe(true);
+    for (const banned of [
+      "DequeueContactAndTransferToQueue",
+      "Wait",
+      "InvokeFlowModule",
+      "UpdateContactTargetQueue",
+      "TransferContactToQueue",
+    ]) {
+      expect(t.has(banned), banned).toBe(false);
+    }
   });
 });
 
@@ -610,7 +908,11 @@ describe("hold flows", () => {
   const holds = flows.map((l) => l.doc).filter((d) => /_HOLD$/.test(d.connectType));
 
   it("has the customer and agent hold flows", () => {
-    expect(holds.map((d) => d.name).sort()).toEqual(["hh-agent-hold", "hh-customer-hold"]);
+    expect(holds.map((d) => d.name).sort()).toEqual([
+      "hh-agent-hold",
+      "hh-customer-hold",
+      "hh-dead-hold",
+    ]);
   });
 
   it("catches a second action, a next and an interrupt, so the shape check means something", () => {
@@ -781,6 +1083,7 @@ describe("the district name follows the contact", () => {
     ...districts.map((d) => [`\${cdref:queue:${d.slug}-crew}`, d.name] as const),
     ["${cdref:queue:lantern-crew}", "Lantern"],
     ["${cdref:queue:dispatch-overflow}", "Dispatch"],
+    ["${cdref:queue:the-dead}", "Beyond"],
   ]);
   const queueFlowName = new Map<string, string>(
     districts.map((d) => [`\${cdref:flow:hh-queue-experience-${d.slug}}`, d.name]),
@@ -834,6 +1137,14 @@ describe("the district name follows the contact", () => {
     const firstCondition = offer?.Transitions.Conditions?.[0];
     if (firstCondition) firstCondition.NextAction = "moving";
     expect(mismatches(broken).length).toBeGreaterThan(0);
+  });
+
+  it("walks the dead line: queue:the-dead needs the Beyond name set first", () => {
+    const dead = structuredClone(doc("hh-dead-line"));
+    action(dead, "set-dead-agent-hold").Transitions.NextAction = "set-patience";
+    expect(mismatches(dead)).toEqual([
+      "hh-dead-line#set-dead-queue: ${cdref:queue:the-dead} with districtName undefined",
+    ]);
   });
 
   it.each(flows.map((l) => l.doc.name))("%s", (name) => {

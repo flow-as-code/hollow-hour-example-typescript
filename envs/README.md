@@ -46,7 +46,16 @@ environment (Connect-managed identity, inbound and outbound calls and flow
 logs on, alias `hollow-hour-example-<environment>-<suffix>`) in that
 environment's Region, and one S3 bucket for every root's state (versioned,
 encrypted, public access blocked, `prevent_destroy`), locked by the S3
-backend's lock object rather than a DynamoDB table. The Regions default to
+backend's lock object rather than a DynamoDB table. Since task T2 it also
+creates one call recording bucket per instance (private, SSE-S3, no customer
+managed key, recordings expired after 30 days) and the instance's
+CALL_RECORDINGS storage config (`recordings.tf`): on 2026-10-05 (17:25 UTC)
+no instance had one, so nothing the flows' recording blocks captured was
+stored (tasks/README.md, tier decision 5; VERIFY.md, RS1). The credentials
+that apply the root need `s3:*Bucket*`, `s3:Put*` on those buckets and
+`connect:AssociateInstanceStorageConfig`, `DescribeInstanceStorageConfig`,
+`UpdateInstanceStorageConfig`, `DisassociateInstanceStorageConfig` on the
+instances. The Regions default to
 this repository's own (dev, qa, prod and the bucket all `us-east-1`; the
 Terraform-first repository keeps its three in `us-west-2`, so the two never
 share a Region); override them with `-var` or `TF_VAR_environments` and

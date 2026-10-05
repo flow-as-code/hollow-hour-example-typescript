@@ -1,0 +1,40 @@
+{
+  "flowdoc": "0.2",
+  "kind": "flow",
+  "name": "hh-dead-hold",
+  "description": "What a departed caller hears while the liaison has them on hold. One loop of prompts and nothing else, as every hold flow here.",
+  "connectType": "CUSTOMER_HOLD",
+  "content": {
+    "Version": "2019-10-30",
+    "StartAction": "on-hold",
+    "Actions": [
+      {
+        "Identifier": "on-hold",
+        "Type": "MessageParticipantIteratively",
+        "Parameters": {
+          "Messages": [
+            {
+              "Text": "Hold music is wasted on you, we know. Back shortly."
+            }
+          ]
+        },
+        "Transitions": {
+          "Errors": [],
+          "Conditions": []
+        }
+      }
+    ]
+  },
+  "layout": {
+    "on-hold": {
+      "x": 20,
+      "y": 20
+    }
+  },
+  "refs": [],
+  "meta": {
+    "generator": "cli@0.2.1",
+    "sourceHash": "sha256:14448191c4cbebf8c6cb2f7318538ec945cafad9e9b0f7d3266f86c1fffad677",
+    "sourceKind": "ts"
+  }
+}

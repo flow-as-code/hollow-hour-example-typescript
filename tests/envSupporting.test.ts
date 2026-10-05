@@ -134,6 +134,36 @@ describe("the hours", () => {
   });
 });
 
+describe("the closed hours (T2, scenario S4)", () => {
+  // The resource needs at least one config block, so "closed" is open for
+  // one minute a week and S4 is never run in that minute (VERIFY.md, HC1).
+  for (const env of ENVIRONMENTS) {
+    it(`${env}: is open Sunday 03:00 to 03:01 America/New_York and nothing else`, () => {
+      const closed =
+        /resource "aws_connect_hours_of_operation" "closed" \{([\s\S]*?)\n\}/.exec(
+          read(env, "supporting.tf"),
+        )?.[1] ?? "";
+      expect(closed).toContain('time_zone   = "America/New_York"');
+      const ranges = [
+        ...closed.matchAll(
+          /config \{\s*day = "([A-Z]+)"\s*start_time \{\s*hours\s*= (\d+)\s*minutes = (\d+)\s*\}\s*end_time \{\s*hours\s*= (\d+)\s*minutes = (\d+)/g,
+        ),
+      ].map((m) => m.slice(1).join(" "));
+      expect(ranges).toEqual(["SUNDAY 3 0 3 1"]);
+      expect(closed).not.toContain("for_each");
+    });
+  }
+
+  it("is the hours:closed binding in every profile", () => {
+    for (const profile of Object.keys(loadManifest().profiles)) {
+      const map = JSON.parse(
+        readFileSync(join(ROOT, "refs", `${profile}.tfmap.json`), "utf8"),
+      ) as Record<string, string>;
+      expect(map["hours:closed"]).toBe("aws_connect_hours_of_operation.closed.arn");
+    }
+  });
+});
+
 describe("the seasonal roots", () => {
   for (const env of ENVIRONMENTS) {
     const text = read(`seasonal-${env}`, "greetings.tf");
