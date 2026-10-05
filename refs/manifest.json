@@ -193,13 +193,16 @@
       "key": "flow:hh-customer-hold",
       "tier": 2,
       "binding": "in-set",
-      "usedBy": ["hh-district-{slug} (CustomerHold hook)"]
+      "usedBy": ["hh-district-{slug}, hh-district-menu, hh-hotline-main (CustomerHold hook)"]
     },
     {
       "key": "flow:hh-agent-hold",
       "tier": 2,
       "binding": "in-set",
-      "usedBy": ["hh-district-{slug}, hh-dead-line (AgentHold hook)"]
+      "usedBy": [
+        "hh-district-{slug}, hh-district-menu, hh-hotline-main (AgentHold hook)",
+        "hh-dead-line (AgentHold hook)"
+      ]
     },
     {
       "key": "flow:hh-dead-line",

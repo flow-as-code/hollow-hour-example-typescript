@@ -9,6 +9,8 @@ The emitted flow set: every in-set FlowDoc (`<name>.flowdoc.json`) and its
 | `hh-hotline-main`            | CONTACT_FLOW     | hand-authored                      |
 | `hh-customer-whisper`        | CUSTOMER_WHISPER | hand-authored                      |
 | `hh-agent-whisper`           | AGENT_WHISPER    | hand-authored                      |
+| `hh-customer-hold`           | CUSTOMER_HOLD    | hand-authored                      |
+| `hh-agent-hold`              | AGENT_HOLD       | hand-authored                      |
 | `hh-district-menu`           | CONTACT_FLOW     | `npm run generate` (`generators/`) |
 | `hh-district-<slug>`         | CONTACT_FLOW     | `npm run generate` (`generators/`) |
 | `hh-queue-experience-<slug>` | CUSTOMER_QUEUE   | `npm run generate` (`generators/`) |
@@ -27,6 +29,15 @@ The emitted flow set: every in-set FlowDoc (`<name>.flowdoc.json`) and its
   adds the district's two flows and one key to the generated
   `hh-district-menu`, and changes no other flow; no hand-authored flow or
   test needs an edit (`tests/generator.test.ts` holds that).
+
+The two hold flows are each one MessageParticipantIteratively and nothing
+else: MessageParticipant and every terminal type are illegal in hold flows,
+and a loop of prompts with no next ends the flow. They are hooked wherever
+the whisper hooks are set (the generated district flows, the dispatch
+fallback, the Lantern Crew chain in `hh-hotline-main`), one hook per block
+(VERIFY.md, row 16.3), so no path an agent can hold on gets Connect's default
+hold. They never run under the simulate harness, which ends every test
+before an agent; their evidence is the create and `tests/flows.test.ts`.
 
 ## What the flows read and write
 
@@ -48,8 +59,8 @@ not):
 | ------------------------------ | --------------------------------------- | ------------------------------------ |
 | `season`                       | the greeting module                     | `hh-hotline-main` (the `season` tag) |
 | `callerName`, `callerStatus`   | `hh-hotline-main`                       | `hh-hotline-main` (welcome back)     |
-| `grade`, `gradeName`, `advice` | `hh-hotline-main` (from the classifier) | `hh-hotline-main`, `hh-agent-whisper` |
-| `district`, `districtName`     | `hh-district-menu`; rewritten by `hh-district-<slug>` before an overflow, by `hh-queue-experience-<slug>` before a move, and by `hh-hotline-main` for the Lantern Crew and dispatch | both whispers, the queue flows' copy |
+| `grade`, `gradeName`, `advice` | `hh-hotline-main` (from the classifier; `gradeName` is `Ungraded` on the dispatch fallback from a failed classification) | `hh-hotline-main`, `hh-agent-whisper`, `hh-agent-hold` |
+| `district`, `districtName`     | `hh-district-menu`; rewritten by `hh-district-<slug>` before an overflow, by `hh-queue-experience-<slug>` before a move, and by `hh-hotline-main` for the Lantern Crew and dispatch | both whispers, `hh-customer-hold`, the queue flows' copy |
 | `moved`                        | `hh-queue-experience-<slug>` (`true` before a move, `false` if it fails) | `hh-queue-experience-<slug>` (skips the offer) |
 
 The interview answers are flow attributes of `hh-hotline-main`, passed to the

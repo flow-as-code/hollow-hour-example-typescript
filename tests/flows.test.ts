@@ -7,7 +7,7 @@
 // manifest and the districts.
 
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   codegen,
@@ -42,12 +42,14 @@ const action = (d: FlowDoc, id: string): FlowAction => {
 const types = (d: FlowDoc) => new Set(d.content.Actions.map((a) => a.Type));
 
 describe("lint", () => {
-  it("has the Tier 1 documents to lint", () => {
+  it("has the Tier 1 and Tier 2 documents to lint", () => {
     const names = [...byName.keys()];
     for (const n of [
       "hh-hotline-main",
       "hh-customer-whisper",
       "hh-agent-whisper",
+      "hh-customer-hold",
+      "hh-agent-hold",
       "hh-greeting-standard",
       "hh-greeting-halloween",
       "hh-district-menu",
@@ -144,13 +146,106 @@ describe("names and references", () => {
     expect(modules).toEqual(["module:greeting@live"]);
   });
 
-  it("uses exactly the manifest's Tier 1 keys", () => {
-    const tier1 = expandAll(loadManifest(), districts)
-      .filter((e) => e.tier === 1)
-      .map((e) => e.key)
-      .sort();
-    const used = [...new Set(flowRefs.map(({ r }) => refKey(r)))].sort();
-    expect(used).toEqual(tier1);
+  // The key-use rule (tasks/T2-full-moon.md): every key a flow uses is a
+  // tier 1 or 2 key, and every tier 1 or 2 key is used by a flow or named by
+  // a scenario as a substitute, except the keys in UNUSED_UNTIL, each dated
+  // and naming the gate that will use it. A listed key a flow does use fails
+  // too, so the list cannot go stale.
+  const UNUSED_UNTIL: Record<string, { gate: string; since: string }> = {
+    "queue:the-dead": { gate: "T2 PR 3, hh-dead-line", since: "2026-10-05" },
+    "lambda:plane-check": { gate: "T2 PR 3, plane-check in hh-hotline-main", since: "2026-10-05" },
+    "flow:hh-dead-line": { gate: "T2 PR 3, hh-hotline-main", since: "2026-10-05" },
+    "flow:hh-dead-whisper": { gate: "T2 PR 3, hh-dead-line", since: "2026-10-05" },
+    "flow:hh-dead-hold": { gate: "T2 PR 3, hh-dead-line", since: "2026-10-05" },
+    "flow:hh-dead-queue-experience": { gate: "T2 PR 3, hh-dead-line", since: "2026-10-05" },
+    "lambda:prank-score": { gate: "T2 PR 4, the prank screen", since: "2026-10-05" },
+    "module:hh-offer-callback": { gate: "T2 PR 6, callbacks", since: "2026-10-05" },
+    "prompt:salt-line-tips": {
+      gate: "T2 PR 7, the prompt and the A/B split",
+      since: "2026-10-05",
+    },
+    "module:hh-collect-address": {
+      gate: "T2 PR 8, once flow-as-code C11 is on npm",
+      since: "2026-10-05",
+    },
+    "lambda:district-for-address": {
+      gate: "T2 PR 8, hh-collect-address; the Lambda stays deployed, since tests/envSupporting.test.ts deploys exactly the manifest's lambda: keys",
+      since: "2026-10-05",
+    },
+  };
+
+  function keyUseProblems(
+    used: Set<string>,
+    tier12: Set<string>,
+    substitutes: Set<string>,
+    unusedUntil: Set<string>,
+  ): string[] {
+    const out: string[] = [];
+    for (const k of [...used].sort()) {
+      if (!tier12.has(k)) out.push(`${k}: used by a flow but not a tier 1 or 2 key`);
+    }
+    for (const k of [...tier12].sort()) {
+      if (!used.has(k) && !substitutes.has(k) && !unusedUntil.has(k)) {
+        out.push(`${k}: a tier 1 or 2 key no flow uses and no scenario substitutes`);
+      }
+    }
+    for (const k of [...unusedUntil].sort()) {
+      if (!tier12.has(k)) out.push(`${k}: in UNUSED_UNTIL but not a tier 1 or 2 key`);
+      if (used.has(k) || substitutes.has(k)) out.push(`${k}: in UNUSED_UNTIL but used`);
+    }
+    return out;
+  }
+
+  const tier12 = new Set(
+    expandAll(loadManifest(), districts)
+      .filter((e) => e.tier === 1 || e.tier === 2)
+      .map((e) => e.key),
+  );
+  const used = new Set(flowRefs.map(({ r }) => refKey(r)));
+  const substitutes = new Set(
+    readdirSync(join(ROOT, "scenarios"))
+      .filter((f) => f.endsWith(".scenario.json"))
+      .flatMap((f) => {
+        const scenario = JSON.parse(readFileSync(join(ROOT, "scenarios", f), "utf8")) as {
+          substitutions?: { substitute: string }[];
+        };
+        return (scenario.substitutions ?? []).map(
+          (sub) => /^\$\{cdref:(.+)\}$/.exec(sub.substitute)?.[1] ?? sub.substitute,
+        );
+      }),
+  );
+
+  it("catches a key outside tiers 1 and 2, an unused key, and a stale UNUSED_UNTIL entry", () => {
+    expect(
+      keyUseProblems(new Set(["queue:a", "lex:b"]), new Set(["queue:a"]), new Set(), new Set()),
+    ).toEqual(["lex:b: used by a flow but not a tier 1 or 2 key"]);
+    expect(
+      keyUseProblems(new Set(["queue:a"]), new Set(["queue:a", "queue:c"]), new Set(), new Set()),
+    ).toEqual(["queue:c: a tier 1 or 2 key no flow uses and no scenario substitutes"]);
+    expect(
+      keyUseProblems(
+        new Set(["queue:a"]),
+        new Set(["queue:a", "queue:c"]),
+        new Set(["queue:c"]),
+        new Set(),
+      ),
+    ).toEqual([]);
+    expect(
+      keyUseProblems(new Set(["queue:a"]), new Set(["queue:a"]), new Set(), new Set(["queue:a"])),
+    ).toEqual(["queue:a: in UNUSED_UNTIL but used"]);
+  });
+
+  it("uses tier 1 and 2 keys only, and every such key, except the dated UNUSED_UNTIL list", () => {
+    expect(keyUseProblems(used, tier12, substitutes, new Set(Object.keys(UNUSED_UNTIL)))).toEqual(
+      [],
+    );
+  });
+
+  it("dates every UNUSED_UNTIL entry and names its gate", () => {
+    for (const [key, entry] of Object.entries(UNUSED_UNTIL)) {
+      expect(entry.since, key).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(entry.gate, key).toMatch(/^T\d PR \d/);
+    }
   });
 });
 
@@ -229,7 +324,7 @@ describe("hh-hotline-main", () => {
     );
   });
 
-  it("names the crew and sets both whispers before the Lantern Crew and dispatch transfers", () => {
+  it("names the crew and sets both whispers and both holds before the Lantern Crew and dispatch transfers", () => {
     const chain = (start: string, stop: string) => {
       const ids: string[] = [];
       for (let id = start; id !== stop;) {
@@ -253,8 +348,30 @@ describe("hh-hotline-main", () => {
       ).toEqual([
         { CustomerWhisper: "${cdref:flow:hh-customer-whisper}" },
         { AgentWhisper: "${cdref:flow:hh-agent-whisper}" },
+        { CustomerHold: "${cdref:flow:hh-customer-hold}" },
+        { AgentHold: "${cdref:flow:hh-agent-hold}" },
       ]);
     }
+  });
+
+  // The agent whisper and hold speak $.Attributes.gradeName, and the dispatch
+  // fallback is the one chain an ungraded caller can reach (the classifier
+  // failed, or the grade could not be recorded), so those two paths name a
+  // grade on the way. A full Lantern Crew keeps the grade it has.
+  it("names the grade Ungraded on the way to dispatch when the classifier failed, and only then", () => {
+    for (const id of ["classify", "record-grade"]) {
+      expect((action(main, id).Transitions.Errors ?? []).map((e) => e.NextAction)).toEqual([
+        "note-ungraded",
+      ]);
+    }
+    const note = action(main, "note-ungraded");
+    expect(note.Type).toBe("UpdateContactAttributes");
+    expect(note.Parameters.Attributes).toEqual({ gradeName: "Ungraded" });
+    expect(note.Transitions.NextAction).toBe("hand-to-dispatch");
+    expect(action(main, "transfer-to-lantern").Transitions.Errors).toContainEqual({
+      ErrorType: "QueueAtCapacity",
+      NextAction: "hand-to-dispatch",
+    });
   });
 
   it("invokes its Lambdas with JSON response validation (VERIFY L1)", () => {
@@ -316,15 +433,17 @@ describe("generated district flows", () => {
     const flow = doc(`hh-district-${d.slug}`);
     const over = districts.find((x) => x.slug === d.overflowTo);
 
-    it(`${d.slug}: sets the target queue first, then the three hooks`, () => {
+    it(`${d.slug}: sets the target queue first, then the five hooks, one per block`, () => {
       const [first, ...rest] = flow.content.Actions;
       expect(flow.content.StartAction).toBe(first?.Identifier);
       expect(first?.Type).toBe("UpdateContactTargetQueue");
       expect(first?.Parameters.QueueId).toBe(`\${cdref:queue:${d.slug}-crew}`);
-      const hooks = rest.slice(0, 3).map((a) => a.Parameters.EventHooks);
+      const hooks = rest.slice(0, 5).map((a) => a.Parameters.EventHooks);
       expect(hooks).toEqual([
         { CustomerWhisper: "${cdref:flow:hh-customer-whisper}" },
         { AgentWhisper: "${cdref:flow:hh-agent-whisper}" },
+        { CustomerHold: "${cdref:flow:hh-customer-hold}" },
+        { AgentHold: "${cdref:flow:hh-agent-hold}" },
         { CustomerQueue: `\${cdref:flow:hh-queue-experience-${d.slug}}` },
       ]);
     });
@@ -451,6 +570,169 @@ describe("generated district flows", () => {
       expect(action(queue, "poll-crews").Parameters.LoopCount).toBe("3");
     });
   }
+});
+
+// A hold flow is one MessageParticipantIteratively and nothing else:
+// MessageParticipant and every terminal type are illegal in hold flows
+// (FLOW_TYPE_RESTRICTIONS; actions.md rule 38), and a holding action with no
+// next ends the flow (terminal-blocks). No interrupt either: there is nothing
+// to interrupt to.
+function holdFlowProblems(d: FlowDoc): string[] {
+  const out: string[] = [];
+  if (d.connectType !== "CUSTOMER_HOLD" && d.connectType !== "AGENT_HOLD") {
+    out.push(`${d.name}: ${d.connectType} is not a hold flow type`);
+  }
+  const [only, ...rest] = d.content.Actions;
+  if (only === undefined || rest.length > 0) {
+    out.push(`${d.name}: ${String(d.content.Actions.length)} actions, expected exactly one`);
+  }
+  if (only === undefined) return out;
+  if (d.content.StartAction !== only.Identifier)
+    out.push(`${d.name}: does not start at ${only.Identifier}`);
+  if (only.Type !== "MessageParticipantIteratively") {
+    out.push(`${d.name}#${only.Identifier}: ${only.Type}, expected MessageParticipantIteratively`);
+  }
+  if (only.Transitions.NextAction !== undefined)
+    out.push(`${d.name}#${only.Identifier}: has a NextAction`);
+  if (
+    (only.Transitions.Conditions ?? []).length > 0 ||
+    (only.Transitions.Errors ?? []).length > 0
+  ) {
+    out.push(`${d.name}#${only.Identifier}: has a condition or error branch`);
+  }
+  if (only.Parameters.InterruptFrequencySeconds !== undefined) {
+    out.push(`${d.name}#${only.Identifier}: has an interrupt`);
+  }
+  return out;
+}
+
+describe("hold flows", () => {
+  const holds = flows.map((l) => l.doc).filter((d) => /_HOLD$/.test(d.connectType));
+
+  it("has the customer and agent hold flows", () => {
+    expect(holds.map((d) => d.name).sort()).toEqual(["hh-agent-hold", "hh-customer-hold"]);
+  });
+
+  it("catches a second action, a next and an interrupt, so the shape check means something", () => {
+    const base = holds[0];
+    if (base === undefined) throw new Error("no hold flow");
+    const extra = structuredClone(base);
+    extra.content.Actions.push({
+      Identifier: "done",
+      Type: "EndFlowExecution",
+      Parameters: {},
+      Transitions: {},
+    });
+    expect(holdFlowProblems(extra)).toEqual([`${base.name}: 2 actions, expected exactly one`]);
+    const next = structuredClone(base);
+    const first = next.content.Actions[0];
+    if (first) {
+      first.Transitions.NextAction = "on-hold";
+      first.Parameters.InterruptFrequencySeconds = "30";
+    }
+    expect(holdFlowProblems(next)).toEqual([
+      `${base.name}#on-hold: has a NextAction`,
+      `${base.name}#on-hold: has an interrupt`,
+    ]);
+  });
+
+  it.each(holds.map((d) => d.name))(
+    "%s is one MessageParticipantIteratively and nothing else",
+    (name) => {
+      expect(holdFlowProblems(doc(name))).toEqual([]);
+    },
+  );
+
+  it("hh-customer-hold names the crew the caller is with; hh-agent-hold names the grade", () => {
+    expect(spokenTexts(action(doc("hh-customer-hold"), "on-hold")).join(" ")).toContain(
+      "$.Attributes.districtName",
+    );
+    expect(spokenTexts(action(doc("hh-agent-hold"), "on-hold")).join(" ")).toContain(
+      "$.Attributes.gradeName",
+    );
+  });
+});
+
+/** Every run of consecutive UpdateContactEventHooks blocks, as the hook names each sets, in order. */
+function hookChains(d: FlowDoc): { start: string; hooks: string[] }[] {
+  const byId = new Map(d.content.Actions.map((a) => [a.Identifier, a]));
+  const isHook = (a: FlowAction | undefined): a is FlowAction =>
+    a?.Type === "UpdateContactEventHooks";
+  const pointedTo = new Set(d.content.Actions.filter(isHook).map((a) => a.Transitions.NextAction));
+  return d.content.Actions.filter((a) => isHook(a) && !pointedTo.has(a.Identifier)).map((a) => {
+    const hooks: string[] = [];
+    for (
+      let cur: FlowAction | undefined = a;
+      isHook(cur);
+      cur = byId.get(cur.Transitions.NextAction ?? "")
+    ) {
+      hooks.push(...Object.keys(cur.Parameters.EventHooks as Record<string, string>));
+    }
+    return { start: a.Identifier, hooks };
+  });
+}
+
+// Wherever a CustomerWhisper hook is set, CustomerHold and AgentHold are set
+// in the same chain of hook blocks, so no path that can reach an agent gets
+// Connect's default hold (decided 2026-10-05).
+function hookChainProblems(d: FlowDoc): string[] {
+  return hookChains(d)
+    .filter((c) => c.hooks.includes("CustomerWhisper"))
+    .flatMap((c) =>
+      ["AgentWhisper", "CustomerHold", "AgentHold"]
+        .filter((h) => !c.hooks.includes(h))
+        .map((h) => `${d.name}#${c.start}: sets CustomerWhisper without ${h}`),
+    );
+}
+
+describe("the whisper and hold hooks travel together", () => {
+  it("catches a chain missing a hold hook, so the check means something", () => {
+    const d = structuredClone(doc(`hh-district-${districts[0]?.slug ?? ""}`));
+    action(d, "set-agent-whisper").Transitions.NextAction = "set-agent-hold";
+    expect(hookChainProblems(d)).toEqual([
+      `${d.name}#set-customer-whisper: sets CustomerWhisper without CustomerHold`,
+    ]);
+    expect(hookChains(d).map((c) => c.hooks)).toContainEqual([
+      "CustomerWhisper",
+      "AgentWhisper",
+      "AgentHold",
+      "CustomerQueue",
+    ]);
+  });
+
+  it.each(flows.map((l) => l.doc.name))("%s", (name) => {
+    expect(hookChainProblems(doc(name))).toEqual([]);
+  });
+
+  it("sets each hook in a block of its own (VERIFY 16.3)", () => {
+    for (const l of flows) {
+      for (const a of l.doc.content.Actions.filter((x) => x.Type === "UpdateContactEventHooks")) {
+        expect(
+          Object.keys(a.Parameters.EventHooks as object),
+          `${l.doc.name}#${a.Identifier}`,
+        ).toHaveLength(1);
+      }
+    }
+  });
+});
+
+describe("no Wait", () => {
+  const waits = (d: FlowDoc) => d.content.Actions.filter((a) => a.Type === "Wait");
+
+  it("would see one, so the check means something", () => {
+    const d = structuredClone(doc("hh-hotline-main"));
+    d.content.Actions.push({
+      Identifier: "pause",
+      Type: "Wait",
+      Parameters: { TimeLimitSeconds: "5" },
+      Transitions: {},
+    });
+    expect(waits(d)).toHaveLength(1);
+  });
+
+  it("appears in no flow: Wait is chat only (VERIFY 16.1), and every flow here is voice", () => {
+    for (const d of byName.values()) expect(waits(d), d.name).toEqual([]);
+  });
 });
 
 describe("whispers and greetings", () => {

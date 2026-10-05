@@ -829,7 +829,7 @@
           "Errors": [
             {
               "ErrorType": "NoMatchingError",
-              "NextAction": "hand-to-dispatch"
+              "NextAction": "note-ungraded"
             }
           ],
           "Conditions": []
@@ -851,7 +851,7 @@
           "Errors": [
             {
               "ErrorType": "NoMatchingError",
-              "NextAction": "hand-to-dispatch"
+              "NextAction": "note-ungraded"
             }
           ],
           "Conditions": []
@@ -1020,6 +1020,44 @@
           }
         },
         "Transitions": {
+          "NextAction": "set-lantern-customer-hold",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-lantern-customer-hold"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-lantern-customer-hold",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "CustomerHold": "${cdref:flow:hh-customer-hold}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-lantern-agent-hold",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-lantern-agent-hold"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-lantern-agent-hold",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "AgentHold": "${cdref:flow:hh-agent-hold}"
+          }
+        },
+        "Transitions": {
           "NextAction": "set-lantern-queue",
           "Errors": [
             {
@@ -1061,6 +1099,26 @@
             {
               "ErrorType": "NoMatchingError",
               "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "note-ungraded",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "gradeName": "Ungraded"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "hand-to-dispatch",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hand-to-dispatch"
             }
           ],
           "Conditions": []
@@ -1128,6 +1186,44 @@
         "Parameters": {
           "EventHooks": {
             "AgentWhisper": "${cdref:flow:hh-agent-whisper}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-dispatch-customer-hold",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-customer-hold"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-customer-hold",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "CustomerHold": "${cdref:flow:hh-customer-hold}"
+          }
+        },
+        "Transitions": {
+          "NextAction": "set-dispatch-agent-hold",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "set-dispatch-agent-hold"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "set-dispatch-agent-hold",
+        "Type": "UpdateContactEventHooks",
+        "Parameters": {
+          "EventHooks": {
+            "AgentHold": "${cdref:flow:hh-agent-hold}"
           }
         },
         "Transitions": {
@@ -1255,7 +1351,7 @@
   },
   "layout": {
     "apologize": {
-      "x": 10940,
+      "x": 11980,
       "y": 120
     },
     "ask-anyone-hurt": {
@@ -1311,15 +1407,15 @@
       "y": 120
     },
     "hand-to-dispatch": {
-      "x": 9380,
+      "x": 9900,
       "y": 20
     },
     "hang-up": {
-      "x": 11200,
+      "x": 12240,
       "y": 20
     },
     "lines-busy": {
-      "x": 10940,
+      "x": 11980,
       "y": 20
     },
     "look-up-caller": {
@@ -1335,7 +1431,7 @@
       "y": 20
     },
     "note-dispatch": {
-      "x": 9640,
+      "x": 10160,
       "y": 20
     },
     "note-injury": {
@@ -1361,6 +1457,10 @@
     "note-touched": {
       "x": 6000,
       "y": 20
+    },
+    "note-ungraded": {
+      "x": 7300,
+      "y": 120
     },
     "offer-end-or-continue": {
       "x": 3140,
@@ -1390,20 +1490,36 @@
       "x": 7820,
       "y": 120
     },
+    "set-dispatch-agent-hold": {
+      "x": 11200,
+      "y": 20
+    },
     "set-dispatch-agent-whisper": {
-      "x": 10160,
+      "x": 10680,
+      "y": 20
+    },
+    "set-dispatch-customer-hold": {
+      "x": 10940,
       "y": 20
     },
     "set-dispatch-customer-whisper": {
-      "x": 9900,
+      "x": 10420,
       "y": 20
     },
     "set-dispatch-queue": {
-      "x": 10420,
+      "x": 11460,
+      "y": 20
+    },
+    "set-lantern-agent-hold": {
+      "x": 9120,
       "y": 20
     },
     "set-lantern-agent-whisper": {
       "x": 8600,
+      "y": 20
+    },
+    "set-lantern-customer-hold": {
+      "x": 8860,
       "y": 20
     },
     "set-lantern-customer-whisper": {
@@ -1411,7 +1527,7 @@
       "y": 20
     },
     "set-lantern-queue": {
-      "x": 8860,
+      "x": 9380,
       "y": 20
     },
     "set-voice": {
@@ -1439,11 +1555,11 @@
       "y": 20
     },
     "transfer-to-dispatch": {
-      "x": 10680,
+      "x": 11720,
       "y": 20
     },
     "transfer-to-lantern": {
-      "x": 9120,
+      "x": 9640,
       "y": 20
     },
     "welcome-back": {
@@ -1453,9 +1569,19 @@
   },
   "refs": [
     {
+      "token": "${cdref:flow:hh-agent-hold}",
+      "type": "flow",
+      "name": "hh-agent-hold"
+    },
+    {
       "token": "${cdref:flow:hh-agent-whisper}",
       "type": "flow",
       "name": "hh-agent-whisper"
+    },
+    {
+      "token": "${cdref:flow:hh-customer-hold}",
+      "type": "flow",
+      "name": "hh-customer-hold"
     },
     {
       "token": "${cdref:flow:hh-customer-whisper}",
@@ -1496,7 +1622,7 @@
   ],
   "meta": {
     "generator": "cli@0.2.1",
-    "sourceHash": "sha256:192be666902c4b3e476970df7189b5baa25581ac12bac9bfa5c68898acb0100f",
+    "sourceHash": "sha256:84124f9efe438876115f5d1506a6111fbbbfd7d911c9ed031d9f020f4743dd5a",
     "sourceKind": "ts"
   }
 }
