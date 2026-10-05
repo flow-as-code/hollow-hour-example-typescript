@@ -77,7 +77,7 @@ describe("refs/manifest.json", () => {
       "flow:hh-agent-whisper",
       "flow:hh-dead-line",
       "module:hh-collect-address",
-      "module:hh-offer-callback",
+      "module:hh-offer-callback@live",
     ]) {
       expect(keys, key).toContain(key);
     }

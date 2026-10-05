@@ -2,7 +2,12 @@
 
 The emitted flow set: every in-set FlowDoc (`<name>.flowdoc.json`) and its
 `.flow.ts` companion, flat, every name prefixed `hh-`. Emitted per profile by
-`npm run emit:<profile>`, linted by `npm run lint:flows`.
+`npm run emit:<profile>`, linted by `npm run lint:flows`. One module lives
+here beside the flows, `hh-offer-callback`, because the flows in this set
+invoke it; the emitter writes its version and `live` alias into the same
+`flows.tf` and binds the alias ARN itself, so it needs no entry in any
+address map and no hand-written release (unlike the greetings in
+`seasonal/`, which nothing in the set invokes).
 
 | Flow                         | Type             | Source                             |
 | ---------------------------- | ---------------- | ---------------------------------- |
@@ -15,6 +20,7 @@ The emitted flow set: every in-set FlowDoc (`<name>.flowdoc.json`) and its
 | `hh-dead-whisper`            | AGENT_WHISPER    | hand-authored                      |
 | `hh-dead-hold`               | CUSTOMER_HOLD    | hand-authored                      |
 | `hh-dead-queue-experience`   | CUSTOMER_QUEUE   | hand-authored                      |
+| `hh-offer-callback`          | MODULE           | hand-authored                      |
 | `hh-district-menu`           | CONTACT_FLOW     | `npm run generate` (`generators/`) |
 | `hh-district-<slug>`         | CONTACT_FLOW     | `npm run generate` (`generators/`) |
 | `hh-queue-experience-<slug>` | CUSTOMER_QUEUE   | `npm run generate` (`generators/`) |
@@ -76,6 +82,27 @@ and reads the advice the caller was given (VERIFY.md, row D1). Its catch-all
 continues to `share-advice`: a refused update never costs the caller the
 advice. The dispatch fallback from a failed classification opens none, since
 there is no advice to record.
+
+Callbacks (tasks/README.md, tier decision 6; VERIFY.md 16.2, 16.12, CB1):
+every CreateCallbackContact names `queue:dispatch-overflow` explicitly,
+never a crew queue, with static delays and attempts, and `tests/flows.test.ts`
+holds that for every flow. `hh-district-<slug>` offers one in two places,
+after hours and at `overflow-full` (the sibling crew is full as well;
+dispatch-overflow is not known to be), through `module:hh-offer-callback@live`:
+the caller's own number (`$.CustomerEndpoint.Address`, both errors wired),
+then the create, then "A crew will call you back as soon as one comes
+free"; a refused create has its own copy and ends the module. The module's
+copy is shift-neutral, because `overflow-full` invokes it mid-shift. A
+caller who presses 2, presses nothing or presses a wrong key at the offer
+hears `sign-off` ("All right. Keep the lights on, and call us again any
+time.") before the hang-up, never a silent disconnect. The offer is never made at `lines-busy`, the QueueAtCapacity branch
+of the dispatch transfer, because that branch is reached exactly when
+dispatch-overflow is full and a callback into a full queue takes the error
+branch. A customer queue flow cannot invoke a module, so
+`hh-queue-experience-<slug>` inlines the same two blocks when `crew-eta`
+says the wait is `later`, errors back to the hold, and ends the taken
+callback with DisconnectParticipant rather than EndFlowExecution, so no
+caller is both queued and holding a callback.
 
 ## What the flows read and write
 

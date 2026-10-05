@@ -65,9 +65,10 @@ const TIER_FLOOR: Record<string, Floor> = {
   },
   // T2 PR 2: the hold flows. PR 3: the dead line's three action types.
   // PR 4: the prank screen's UntagContact. PR 5: the work order's
-  // UpdateContactData.
+  // UpdateContactData. PR 6: the callbacks' CreateCallbackContact.
   "2": {
     actionTypes: [
+      "CreateCallbackContact",
       "UntagContact",
       "UpdateContactCallbackNumber",
       "UpdateContactData",

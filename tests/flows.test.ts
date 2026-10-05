@@ -54,6 +54,7 @@ describe("lint", () => {
       "hh-dead-whisper",
       "hh-dead-hold",
       "hh-dead-queue-experience",
+      "hh-offer-callback",
       "hh-greeting-standard",
       "hh-greeting-halloween",
       "hh-district-menu",
@@ -126,9 +127,14 @@ describe("names and references", () => {
     }
   });
 
-  it("keeps the greetings out of the emitted set and the flows out of seasonal/", () => {
+  // flows/ holds the flows and, since T2, the one in-set module they invoke;
+  // seasonal/ holds modules only, the greetings nothing in the set invokes.
+  it("keeps the greetings out of the emitted set, and holds exactly one module beside the flows", () => {
     expect(seasonal.every((l) => l.doc.kind === "module")).toBe(true);
-    expect(flows.every((l) => l.doc.kind === "flow")).toBe(true);
+    expect(flows.filter((l) => l.doc.kind === "module").map((l) => l.doc.name)).toEqual([
+      "hh-offer-callback",
+    ]);
+    expect(flows.every((l) => l.doc.kind === "flow" || l.doc.kind === "module")).toBe(true);
   });
 
   const flowRefs = flows.flatMap((l) =>
@@ -143,11 +149,24 @@ describe("names and references", () => {
     expect(dangling).toEqual([]);
   });
 
+  // An in-set module is one flows/ holds (kind module); the emitter writes its
+  // version and alias beside the flows and binds the alias ARN itself. The
+  // typed Refs.module takes an alias, so every module reference carries one.
+  const inSetModules = new Set(flows.filter((l) => l.doc.kind === "module").map((l) => l.doc.name));
+  const moduleRefs = [
+    ...new Set(flowRefs.filter(({ r }) => r.type === "module").map(({ r }) => refKey(r))),
+  ].sort();
+
   it("reaches out of the set only through module:greeting@live", () => {
-    const modules = [
-      ...new Set(flowRefs.filter(({ r }) => r.type === "module").map(({ r }) => refKey(r))),
-    ];
-    expect(modules).toEqual(["module:greeting@live"]);
+    const outOfSet = moduleRefs.filter(
+      (k) => !inSetModules.has(/^module:([^@]+)/.exec(k)?.[1] ?? ""),
+    );
+    expect(outOfSet).toEqual(["module:greeting@live"]);
+  });
+
+  it("invokes every in-set module through its live alias, and invokes each one", () => {
+    const inSet = moduleRefs.filter((k) => inSetModules.has(/^module:([^@]+)/.exec(k)?.[1] ?? ""));
+    expect(inSet).toEqual([...inSetModules].sort().map((name) => `module:${name}@live`));
   });
 
   // The key-use rule (tasks/T2-full-moon.md): every key a flow uses is a
@@ -156,11 +175,6 @@ describe("names and references", () => {
   // and naming the gate that will use it. A listed key a flow does use fails
   // too, so the list cannot go stale.
   const UNUSED_UNTIL: Record<string, { gate: string; since: string }> = {
-    "hours:closed": {
-      gate: "T2 PR 6, S4 substitutes it for a district's hours",
-      since: "2026-10-05",
-    },
-    "module:hh-offer-callback": { gate: "T2 PR 6, callbacks", since: "2026-10-05" },
     "prompt:salt-line-tips": {
       gate: "T2 PR 7, the prompt and the A/B split",
       since: "2026-10-05",
@@ -1009,6 +1023,221 @@ describe("the callback number", () => {
   });
 });
 
+/**
+ * Every callback in a document, as a list of what is wrong with it (tier
+ * decision 6, VERIFY 16.2): each CreateCallbackContact names
+ * queue:dispatch-overflow explicitly, never a crew queue and never the
+ * contact's current queue by omission, with static delays and attempts; and
+ * neither a create nor an invoke of the callback module is reachable from
+ * lines-busy, the branch taken exactly when dispatch-overflow is full, where
+ * a create would take its error branch.
+ */
+function callbackProblems(d: FlowDoc, crews: ReadonlySet<string>): string[] {
+  const out: string[] = [];
+  const hasLinesBusy = d.content.Actions.some((a) => a.Identifier === "lines-busy");
+  for (const a of d.content.Actions) {
+    const where = `${d.name}#${a.Identifier}`;
+    const offers =
+      a.Type === "CreateCallbackContact" ||
+      (a.Type === "InvokeFlowModule" &&
+        a.Parameters.FlowModuleId === "${cdref:module:hh-offer-callback@live}");
+    if (!offers) continue;
+    if (a.Type === "CreateCallbackContact") {
+      const queue = a.Parameters.QueueId;
+      if (queue === undefined) out.push(`${where}: names no queue`);
+      else if (crews.has(String(queue))) out.push(`${where}: names a crew queue, ${String(queue)}`);
+      else if (queue !== "${cdref:queue:dispatch-overflow}") {
+        out.push(`${where}: names ${String(queue)}, not queue:dispatch-overflow`);
+      }
+      for (const key of [
+        "InitialCallDelaySeconds",
+        "MaximumConnectionAttempts",
+        "RetryDelaySeconds",
+      ]) {
+        if (!/^[1-9][0-9]*$/.test(String(a.Parameters[key]))) {
+          out.push(`${where}: ${key} is ${String(a.Parameters[key])}, not a static count`);
+        }
+      }
+    }
+    if (hasLinesBusy && reachesWithout(d, "lines-busy", a.Identifier, "")) {
+      out.push(`${where}: reachable from lines-busy`);
+    }
+  }
+  return out;
+}
+
+describe("callbacks", () => {
+  const crews = new Set(districts.map((d) => `\${cdref:queue:${d.slug}-crew}`));
+  const first = districts[0];
+  if (first === undefined) throw new Error("no districts");
+  const district = doc(`hh-district-${first.slug}`);
+  const queue = doc(`hh-queue-experience-${first.slug}`);
+
+  it("catches a missing queue, a crew queue, a dynamic delay and an offer reachable from lines-busy", () => {
+    const q = structuredClone(queue);
+    const create = action(q, "create-callback");
+    delete create.Parameters.QueueId;
+    create.Parameters.RetryDelaySeconds = "$.Attributes.retry";
+    expect(callbackProblems(q, crews)).toEqual([
+      `${q.name}#create-callback: names no queue`,
+      `${q.name}#create-callback: RetryDelaySeconds is $.Attributes.retry, not a static count`,
+    ]);
+    create.Parameters.QueueId = `\${cdref:queue:${first.slug}-crew}`;
+    expect(callbackProblems(q, crews)).toContain(
+      `${q.name}#create-callback: names a crew queue, \${cdref:queue:${first.slug}-crew}`,
+    );
+    const d = structuredClone(district);
+    action(d, "lines-busy").Transitions.NextAction = "offer-callback";
+    expect(callbackProblems(d, crews)).toEqual([
+      `${d.name}#take-callback: reachable from lines-busy`,
+    ]);
+  });
+
+  it.each(flows.map((l) => l.doc.name))(
+    "%s: every callback names queue:dispatch-overflow explicitly, statically scheduled, never from lines-busy",
+    (name) => {
+      expect(callbackProblems(doc(name), crews)).toEqual([]);
+    },
+  );
+
+  it("creates callbacks in the module and in each queue flow, and nowhere else", () => {
+    const creates = flows
+      .flatMap((l) =>
+        l.doc.content.Actions.filter((a) => a.Type === "CreateCallbackContact").map(
+          (a) => `${l.doc.name}#${a.Identifier}`,
+        ),
+      )
+      .sort();
+    expect(creates).toEqual(
+      [
+        "hh-offer-callback#create-callback",
+        ...districts.map((d) => `hh-queue-experience-${d.slug}#create-callback`),
+      ].sort(),
+    );
+  });
+
+  it("hh-offer-callback: number, create, and a copy of its own for a refused create, every path ending the module", () => {
+    // Resolved here, not at describe time, so a missing module fails this
+    // test by name instead of crashing the file's collection.
+    const module = doc("hh-offer-callback");
+    expect(module.connectType).toBe("MODULE");
+    expect(module.content.StartAction).toBe("set-callback-number");
+    expect(action(module, "set-callback-number").Transitions.NextAction).toBe("create-callback");
+    const create = action(module, "create-callback");
+    expect(create.Transitions.NextAction).toBe("callback-taken");
+    expect(create.Transitions.Errors).toEqual([
+      { ErrorType: "NoMatchingError", NextAction: "callback-refused" },
+    ]);
+    expect(action(module, "callback-refused").Parameters.Text).toContain(
+      "We cannot take a callback right now",
+    );
+    // Shift-neutral: the module is invoked at overflow-full as well as after hours.
+    expect(action(module, "callback-taken").Parameters.Text).toContain(
+      "A crew will call you back as soon as one comes free",
+    );
+    expect(action(module, "cannot-ring-back").Parameters.Text).not.toMatch(/night shift/);
+    for (const e of action(module, "set-callback-number").Transitions.Errors ?? []) {
+      expect(e.NextAction).toBe("cannot-ring-back");
+    }
+    expect(action(module, "done").Type).toBe("EndFlowModuleExecution");
+    for (const a of module.content.Actions.filter((x) => x.Type === "MessageParticipant")) {
+      expect(a.Transitions.NextAction, a.Identifier).toBe("done");
+    }
+  });
+
+  for (const d of districts) {
+    const flow = doc(`hh-district-${d.slug}`);
+
+    it(`${d.slug}: offers the callback after hours and at overflow-full, through the module, signs off a caller who declines, and keeps lines-busy plain`, () => {
+      expect(
+        (action(flow, "transfer-to-overflow").Transitions.Errors ?? []).find(
+          (e) => e.ErrorType === "QueueAtCapacity",
+        )?.NextAction,
+      ).toBe("overflow-full");
+      expect(action(flow, "overflow-full").Transitions.NextAction).toBe("offer-callback");
+      expect(action(flow, "after-hours").Transitions.NextAction).toBe("offer-callback");
+      const offer = action(flow, "offer-callback");
+      expect(
+        (offer.Transitions.Conditions ?? []).map((c) => [c.Condition.Operands[0], c.NextAction]),
+      ).toEqual([
+        ["1", "take-callback"],
+        ["2", "sign-off"],
+      ]);
+      // A decline, a timeout, a wrong key and an input error all hear the
+      // sign-off before the hang-up; nothing disconnects in silence.
+      expect(offer.Transitions.NextAction).toBe("sign-off");
+      expect((offer.Transitions.Errors ?? []).map((e) => e.ErrorType).sort()).toEqual([
+        "InputTimeLimitExceeded",
+        "NoMatchingCondition",
+        "NoMatchingError",
+      ]);
+      for (const e of offer.Transitions.Errors ?? []) expect(e.NextAction).toBe("sign-off");
+      const signOff = action(flow, "sign-off");
+      expect(signOff.Type).toBe("MessageParticipant");
+      expect(signOff.Transitions.NextAction).toBe("hang-up");
+      const take = action(flow, "take-callback");
+      expect(take.Type).toBe("InvokeFlowModule");
+      expect(take.Parameters.FlowModuleId).toBe("${cdref:module:hh-offer-callback@live}");
+      expect(take.Transitions.NextAction).toBe("hang-up");
+      expect(
+        (action(flow, "transfer-to-dispatch").Transitions.Errors ?? []).find(
+          (e) => e.ErrorType === "QueueAtCapacity",
+        )?.NextAction,
+      ).toBe("lines-busy");
+      expect(action(flow, "lines-busy").Transitions.NextAction).toBe("hang-up");
+    });
+  }
+
+  /** The terminal types reachable from a callback's success branch in a queue flow. */
+  const endsOfCallbackPath = (d: FlowDoc) => {
+    const next = action(d, "create-callback").Transitions.NextAction ?? "";
+    return d.content.Actions.filter(
+      (a) =>
+        ["DisconnectParticipant", "EndFlowExecution"].includes(a.Type) &&
+        reachesWithout(d, next, a.Identifier, ""),
+    ).map((a) => a.Type);
+  };
+
+  it("would notice a queue flow's callback path ending the flow instead of the call", () => {
+    const q = structuredClone(queue);
+    action(q, "callback-taken").Transitions.NextAction = "done";
+    expect(endsOfCallbackPath(q)).toContain("EndFlowExecution");
+  });
+
+  for (const d of districts) {
+    const q = doc(`hh-queue-experience-${d.slug}`);
+
+    it(`hh-queue-experience-${d.slug}: offers an inline callback on a long wait, errors back to the hold, and ends the call once taken`, () => {
+      expect(action(q, "share-eta").Transitions.NextAction).toBe("check-eta-band");
+      const band = action(q, "check-eta-band");
+      expect(band.Parameters.ComparisonValue).toBe("$.External.etaBand");
+      expect(band.Transitions.Conditions).toEqual([
+        { NextAction: "offer-callback", Condition: { Operator: "Equals", Operands: ["later"] } },
+      ]);
+      expect(band.Transitions.NextAction).toBe("check-sibling");
+      const offer = action(q, "offer-callback");
+      expect(
+        (offer.Transitions.Conditions ?? []).map((c) => [c.Condition.Operands[0], c.NextAction]),
+      ).toEqual([
+        ["1", "set-callback-number"],
+        ["2", "check-sibling"],
+      ]);
+      expect(action(q, "set-callback-number").Transitions.NextAction).toBe("create-callback");
+      for (const e of action(q, "set-callback-number").Transitions.Errors ?? []) {
+        expect(e.NextAction).toBe("cannot-ring-back");
+      }
+      expect(action(q, "cannot-ring-back").Transitions.NextAction).toBe("hold");
+      expect(action(q, "create-callback").Transitions.Errors).toEqual([
+        { ErrorType: "NoMatchingError", NextAction: "callback-refused" },
+      ]);
+      expect(action(q, "callback-refused").Transitions.NextAction).toBe("hold");
+      expect(action(q, "callback-taken").Transitions.NextAction).toBe("let-go");
+      expect(action(q, "let-go").Type).toBe("DisconnectParticipant");
+      expect(endsOfCallbackPath(q)).toEqual(["DisconnectParticipant"]);
+    });
+  }
+});
+
 describe("hh-dead-queue-experience", () => {
   const q = doc("hh-dead-queue-experience");
 
@@ -1136,11 +1365,11 @@ describe("generated district flows", () => {
       expect(hook.Transitions.NextAction).toBe("set-overflow-queue");
     });
 
-    it(`${d.slug}: closes after hours with a message and a disconnect`, () => {
+    it(`${d.slug}: closes after hours with a message, then the callback offer`, () => {
       expect(action(flow, "check-hours").Parameters.HoursOfOperationId).toBe(
         `\${cdref:hours:${d.slug}}`,
       );
-      expect(action(flow, "after-hours").Transitions.NextAction).toBe("hang-up");
+      expect(action(flow, "after-hours").Transitions.NextAction).toBe("offer-callback");
       // An hours-check error rejoins the staffing check: a caller is never
       // turned away because the hours could not be read.
       const hours = action(flow, "check-hours");
@@ -1489,6 +1718,19 @@ describe("the district name follows the contact", () => {
     const firstCondition = offer?.Transitions.Conditions?.[0];
     if (firstCondition) firstCondition.NextAction = "moving";
     expect(mismatches(broken).length).toBeGreaterThan(0);
+  });
+
+  // The callback offers hang off after-hours and overflow-full; the walk
+  // reaches both, so a queue set on either path with the wrong name shows.
+  // A CreateCallbackContact is not a target queue: the callback keeps the
+  // district attributes the caller had (tier decision 6), whichever queue
+  // works it.
+  it("walks the callback offer in a district flow", () => {
+    const d = structuredClone(doc(`hh-district-${districts[0]?.slug ?? ""}`));
+    action(d, "after-hours").Transitions.NextAction = "set-overflow-queue";
+    expect(mismatches(d)).toEqual([
+      `${d.name}#set-overflow-queue: \${cdref:queue:${districts[0]?.overflowTo ?? ""}-crew} with districtName ${districts[0]?.name ?? ""}`,
+    ]);
   });
 
   it("walks the dead line: queue:the-dead needs the Beyond name set first", () => {

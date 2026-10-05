@@ -47,7 +47,7 @@
       },
       "usedBy": [
         "hh-district-{slug} (error fallback)",
-        "callbacks when a crew queue is full (tier 2)"
+        "hh-offer-callback and hh-queue-experience-{slug} (every CreateCallbackContact, tier 2)"
       ]
     },
     {
@@ -244,10 +244,11 @@
       "usedBy": ["hh-hotline-main"]
     },
     {
-      "key": "module:hh-offer-callback",
+      "key": "module:hh-offer-callback@live",
       "tier": 2,
       "binding": "in-set",
-      "usedBy": ["hh-district-{slug}"]
+      "usedBy": ["hh-district-{slug} (after hours and at overflow-full)"],
+      "note": "In set: the emitter writes the module, its version and its live alias into the same flows.tf as the flows that invoke it, and binds the alias ARN. Aliased because the typed Refs.module takes an alias (tasks/T2-full-moon.md, Deviations)."
     },
     {
       "key": "lex:apparition-id",

@@ -18,15 +18,15 @@ the generic-block policy, the C11 gate).
 
 The seven modeled action types this tier adds, each with its one home:
 
-| Action type                    | Flow                                                                     | Block and story                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------------------------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| UpdateContactRecordingBehavior | `hh-dead-line`                                                           | `dead-welcome` (MessageParticipant) first, then `record-agent-only` with RecordedParticipants `["Agent"]` and no error branch (rule 37). The Queue of the Dead records only the living liaison. `["Agent"]` still enables recording, so recording-consent applies and the welcome must come first (VERIFY 16.4).                                                                                  |
-| UpdateContactRoutingBehavior   | `hh-dead-line`                                                           | `set-patience`, QueueTimeAdjustmentSeconds `"-300"`, static, never with QueuePriority, before `set-dead-queue` and `transfer-to-dead`. "You have waited this long; the living go first tonight." (VERIFY 16.5)                                                                                                                                                                                    |
-| UpdateContactCallbackNumber    | `hh-dead-line`, `module:hh-offer-callback`, `hh-queue-experience-<slug>` | The number is `$.CustomerEndpoint.Address`, never static. CallbackNumberNotDialable and InvalidCallbackNumber are both wired. In the dead line both say "We cannot ring you back where you are, so stay on the line" and rejoin (VERIFY 6.2).                                                                                                                                                     |
-| CreateCallbackContact          | `module:hh-offer-callback`, inline in `hh-queue-experience-<slug>`       | Always `queue:dispatch-overflow` (tier decision 6 in [README.md](README.md)), static delays and attempts. Offered at `after-hours` and at the new `overflow-full`, never at `lines-busy`, which is reached only when dispatch-overflow is itself full (16.2: a callback into a full queue takes the error branch). Copy: "a crew will call when the night shift starts" (VERIFY 16.2, 16.12, Q2). |
-| UntagContact                   | `hh-hotline-main`, the prank screen                                      | `untag-screen` clears `screen` when a flagged caller presses 1 to say it is really happening. A wrong guess leaves no mark.                                                                                                                                                                                                                                                                       |
-| UpdateContactData              | `hh-hotline-main`                                                        | `open-work-order` after `record-grade`, before `share-advice`. Name static ("Hollow Hour work order"), Description `$.Attributes.advice`, catch-all wired. Every call becomes a work order the crew can find in contact search (VERIFY D1).                                                                                                                                                       |
-| DistributeByPercentage         | `hh-queue-experience-<slug>` (generated)                                 | `pick-hold-variant` after `check-moved` NoMatch, 50/50. Each side sets `holdVariant` and tags it; `hold` then plays the spoken tips or `prompt:salt-line-tips`. A real A/B test, readable in contact search by tag (VERIFY DP1).                                                                                                                                                                  |
+| Action type                    | Flow                                                                     | Block and story                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UpdateContactRecordingBehavior | `hh-dead-line`                                                           | `dead-welcome` (MessageParticipant) first, then `record-agent-only` with RecordedParticipants `["Agent"]` and no error branch (rule 37). The Queue of the Dead records only the living liaison. `["Agent"]` still enables recording, so recording-consent applies and the welcome must come first (VERIFY 16.4).                                                                                                                                                                 |
+| UpdateContactRoutingBehavior   | `hh-dead-line`                                                           | `set-patience`, QueueTimeAdjustmentSeconds `"-300"`, static, never with QueuePriority, before `set-dead-queue` and `transfer-to-dead`. "You have waited this long; the living go first tonight." (VERIFY 16.5)                                                                                                                                                                                                                                                                   |
+| UpdateContactCallbackNumber    | `hh-dead-line`, `module:hh-offer-callback`, `hh-queue-experience-<slug>` | The number is `$.CustomerEndpoint.Address`, never static. CallbackNumberNotDialable and InvalidCallbackNumber are both wired. In the dead line both say "We cannot ring you back where you are, so stay on the line" and rejoin (VERIFY 6.2).                                                                                                                                                                                                                                    |
+| CreateCallbackContact          | `module:hh-offer-callback`, inline in `hh-queue-experience-<slug>`       | Always `queue:dispatch-overflow` (tier decision 6 in [README.md](README.md)), static delays and attempts. Offered at `after-hours` and at the new `overflow-full`, never at `lines-busy`, which is reached only when dispatch-overflow is itself full (16.2: a callback into a full queue takes the error branch). Copy is shift-neutral ("a crew will call you back as soon as one comes free"), because `overflow-full` invokes the module mid-shift (VERIFY 16.2, 16.12, Q2). |
+| UntagContact                   | `hh-hotline-main`, the prank screen                                      | `untag-screen` clears `screen` when a flagged caller presses 1 to say it is really happening. A wrong guess leaves no mark.                                                                                                                                                                                                                                                                                                                                                      |
+| UpdateContactData              | `hh-hotline-main`                                                        | `open-work-order` after `record-grade`, before `share-advice`. Name static ("Hollow Hour work order"), Description `$.Attributes.advice`, catch-all wired. Every call becomes a work order the crew can find in contact search (VERIFY D1).                                                                                                                                                                                                                                      |
+| DistributeByPercentage         | `hh-queue-experience-<slug>` (generated)                                 | `pick-hold-variant` after `check-moved` NoMatch, 50/50. Each side sets `holdVariant` and tags it; `hold` then plays the spoken tips or `prompt:salt-line-tips`. A real A/B test, readable in contact search by tag (VERIFY DP1).                                                                                                                                                                                                                                                 |
 
 New flows, all in the emitted set:
 
@@ -60,8 +60,9 @@ New flows, all in the emitted set:
   on `queue:dispatch-overflow`, EndFlowModuleExecution; `create-callback`'s
   NoMatchingError has its own copy ("We cannot take a callback right now;
   please call back in a few minutes") and ends the module. Invoked from the
-  generated `hh-district-<slug>` at `after-hours` ("press 1 for a callback
-  when the night shift starts, 2 to end") and at `overflow-full`, the new
+  generated `hh-district-<slug>` at `after-hours` ("press 1 for a callback,
+  2 to end"; a 2, a timeout, a wrong key or an input error hears `sign-off`
+  before the hang-up) and at `overflow-full`, the new
   QueueAtCapacity target of `transfer-to-overflow` (the sibling crew queue
   is full; dispatch-overflow is not known to be). `lines-busy`, the
   QueueAtCapacity target of `transfer-to-dispatch`, keeps its plain "call
@@ -290,9 +291,10 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       five flow types and five reference types Tier 1 used, and tier 2's
       names CUSTOMER_HOLD and AGENT_HOLD (PR 2) and
       UpdateContactRecordingBehavior, UpdateContactRoutingBehavior and
-      UpdateContactCallbackNumber (PR 3), UntagContact (PR 4) and
-      UpdateContactData (PR 5). The other two action types and the `prompt`
-      reference type join it with the PRs that land them.
+      UpdateContactCallbackNumber (PR 3), UntagContact (PR 4),
+      UpdateContactData (PR 5) and CreateCallbackContact (PR 6).
+      DistributeByPercentage and the `prompt` reference type join it with
+      PR 7.
 - [ ] 4, in part: the generic-block policy test (PR 1, `tests/flows.test.ts`,
       "generic blocks"): every companion in `flows/` and `seasonal/` writes
       no `GenericBlock` for a type the catalog models, with the mutation case
@@ -327,21 +329,42 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       path to `share-advice`, with the static Name, the Description
       `$.Attributes.advice` and the catch-all wired (mutations: a JSONPath
       Name, a static Description, no catch-all, the block moved ahead of
-      the grade, the grade wired past it).
+      the grade, the grade wired past it). PR 6 adds, each with its mutation
+      case: every CreateCallbackContact names `queue:dispatch-overflow`
+      explicitly, never a crew queue, with static counts, and neither a
+      create nor an invoke of the callback module is reachable from
+      `lines-busy` (mutations: no queue, a crew queue, a JSONPath delay,
+      `lines-busy` wired to the offer); the creates are exactly the
+      module's and one per queue flow; the module's shape (number, create,
+      its own copy for a refused create, every path to
+      EndFlowModuleExecution); the district offer after hours and at
+      `overflow-full` through `module:hh-offer-callback@live`, with
+      `lines-busy` unchanged; the queue flow's callback path ends in
+      DisconnectParticipant (mutation: the confirmation wired to `done`);
+      both callback-number errors wired wherever the number is set (the
+      PR 3 check, now over the module and the queue flows too); the
+      district-name walk reaches the offer paths (mutation: `after-hours`
+      wired to the sibling's queue); flows/ holds exactly one module and the
+      in-set module is invoked through its live alias; and the key-use list
+      drops `hours:closed` (S4 substitutes it) and the callback module.
 - [ ] 5, in part: the new flows are under the banned-terms, phone-range and
       emergency-line checks like every other; PR 4 adds the kind ending of
       the prank path (`dare-goodbye` thanks the caller and invites them
       back, `kind-check` says it is all right) and bans accusations.
 - [ ] 8, in part: S1 (`scenarios/s1-safety-path.scenario.json`, PR 1), S5
-      (`scenarios/s5-departed-caller.scenario.json`, PR 3) and S3
-      (`scenarios/s3-theos-dare.scenario.json`, PR 4), checked offline by
-      `tests/envScenarios.test.ts`; none run live yet.
+      (`scenarios/s5-departed-caller.scenario.json`, PR 3), S3
+      (`scenarios/s3-theos-dare.scenario.json`, PR 4) and S4
+      (`scenarios/s4-after-hours-callback.scenario.json`, PR 6, with the
+      `hours:closed` substitution and the operator sweep in
+      `scenarios/README.md`, "After an S4 run"), checked offline by
+      `tests/envScenarios.test.ts`; none run live yet. The hold flows and
+      the A/B branch are listed there as not simulatable.
 - [ ] 9, in part: `tests/verify.test.ts` accepts `docs-checked YYYY-MM-DD`
       and `harness-checked YYYY-MM-DD: <result>` beside the two earlier
       shapes, each with positive and negative cases (PR 1). HC1 added with
       `hours:closed` (PR 3), `needs sandbox`; RS1 added for the recording
       storage (below), `needs sandbox`; D1 added with the work order (PR 5),
-      `needs sandbox`.
+      `needs sandbox`; CB1 added with the callbacks (PR 6), `needs sandbox`.
 - [ ] Recording storage (tier decision 5), checked 2026-10-05 at 17:25 UTC:
       `list-instance-storage-configs` for CALL_RECORDINGS returned `[]` on
       dev, qa and prod (all us-east-1), so `envs/bootstrap/recordings.tf`
@@ -507,3 +530,19 @@ awscc_connect_prompt.salt_line_tips.prompt_arn`) and `hh-district-menu.tf`.
 - **A VERIFY row the plan did not list, RS1** (PR 3): the recording storage
   config with no customer managed key is a Connect behavior newly relied on
   (CONTRIBUTING.md), so it has a row beside HC1.
+- **`hh-offer-callback` is invoked through a `live` alias, not unaliased**
+  (PR 6, 2026-10-05). The plan bound the in-set module unaliased, which
+  `@flow-as-code/hcl`'s `bindingsFor` supports, but the typed path does not:
+  `Refs.module(name, alias)` in `@flow-as-code/core` 0.2.1 takes an alias,
+  and codegen writes an unaliased InvokeFlowModule as a GenericBlock
+  ("Refs.module requires an alias"), which the generic-block policy test of
+  PR 1 refuses for a modeled type. So the key is
+  `module:hh-offer-callback@live`, the emitter writes the module's version
+  and alias into the same `flows.tf` as the flows that invoke it (two more
+  resources per environment, applied together, keyed on the content hash
+  with `create_before_destroy`, exactly the shape the greetings carry by
+  hand), and `scenarios/resource-map.mjs` maps `module:<name>` and
+  `module:<name>@<alias>` from the flow root's state so `npm run drift`
+  compares the reference through the key. The address maps are unchanged:
+  an in-set key has no entry. Worth raising in flow-as-code: the builder and
+  codegen cannot express the unaliased form the emitter binds.

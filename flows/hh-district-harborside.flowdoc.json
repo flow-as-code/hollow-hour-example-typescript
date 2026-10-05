@@ -362,7 +362,7 @@
           "Errors": [
             {
               "ErrorType": "QueueAtCapacity",
-              "NextAction": "lines-busy"
+              "NextAction": "overflow-full"
             },
             {
               "ErrorType": "NoMatchingError",
@@ -373,10 +373,107 @@
         }
       },
       {
+        "Identifier": "overflow-full",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "The $.FlowAttributes.overflowCrew crew is full as well, so every crew near you is out tonight."
+        },
+        "Transitions": {
+          "NextAction": "offer-callback",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "offer-callback"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
         "Identifier": "after-hours",
         "Type": "MessageParticipant",
         "Parameters": {
           "Text": "The Harborside crew is off shift right now. Night crews start at 4 in the afternoon. If anyone is hurt or in danger, call your local emergency number (911 in the US)."
+        },
+        "Transitions": {
+          "NextAction": "offer-callback",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "offer-callback"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "offer-callback",
+        "Type": "GetParticipantInput",
+        "Parameters": {
+          "InputTimeLimitSeconds": "8",
+          "StoreInput": "False",
+          "Text": "We can call you back instead. For a callback, press 1. To end the call, press 2."
+        },
+        "Transitions": {
+          "NextAction": "sign-off",
+          "Errors": [
+            {
+              "ErrorType": "InputTimeLimitExceeded",
+              "NextAction": "sign-off"
+            },
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "sign-off"
+            },
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "sign-off"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "take-callback",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "NextAction": "sign-off",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "2"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "take-callback",
+        "Type": "InvokeFlowModule",
+        "Parameters": {
+          "FlowModuleId": "${cdref:module:hh-offer-callback@live}"
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "sign-off",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "All right. Keep the lights on, and call us again any time."
         },
         "Transitions": {
           "NextAction": "hang-up",
@@ -590,8 +687,8 @@
       "y": 20
     },
     "apologize": {
-      "x": 4440,
-      "y": 120
+      "x": 5220,
+      "y": 20
     },
     "check-hours": {
       "x": 1840,
@@ -614,12 +711,12 @@
       "y": 120
     },
     "hang-up": {
-      "x": 4700,
+      "x": 5480,
       "y": 20
     },
     "lines-busy": {
-      "x": 4440,
-      "y": 20
+      "x": 2360,
+      "y": 220
     },
     "note-dispatch": {
       "x": 540,
@@ -631,6 +728,14 @@
     },
     "note-overflow-district": {
       "x": 3400,
+      "y": 20
+    },
+    "offer-callback": {
+      "x": 4700,
+      "y": 20
+    },
+    "overflow-full": {
+      "x": 4440,
       "y": 20
     },
     "read-queue": {
@@ -689,6 +794,14 @@
       "x": 1320,
       "y": 20
     },
+    "sign-off": {
+      "x": 4960,
+      "y": 20
+    },
+    "take-callback": {
+      "x": 4960,
+      "y": 120
+    },
     "transfer-to-crew": {
       "x": 2880,
       "y": 20
@@ -739,6 +852,12 @@
       "name": "harborside"
     },
     {
+      "token": "${cdref:module:hh-offer-callback@live}",
+      "type": "module",
+      "name": "hh-offer-callback",
+      "alias": "live"
+    },
+    {
       "token": "${cdref:queue:dispatch-overflow}",
       "type": "queue",
       "name": "dispatch-overflow"
@@ -756,7 +875,7 @@
   ],
   "meta": {
     "generator": "hollow-hour-example generators/districts.ts",
-    "sourceHash": "sha256:39c0e42239e436f516070a083ffd05f8c79f245dfaedf481938d7c2e07ea9c68",
+    "sourceHash": "sha256:a8a21856e03d14cb80b7e6e1fb663b4c53986e7b641d016ec74312d1d7fe02f5",
     "sourceKind": "ts"
   }
 }
