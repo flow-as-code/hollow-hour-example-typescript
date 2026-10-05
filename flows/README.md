@@ -54,6 +54,20 @@ callback number from the caller's own with both errors wired (6.2), checks
 `hours:the-dead` (both branches continue) and transfers to `queue:the-dead`
 with QueueAtCapacity wired.
 
+The prank screen sits between the last interview question and the
+classifier: `check-injured-first` sends a caller who said someone is hurt
+straight to `classify` (safety first, whatever the score), everyone else to
+`lambda:prank-score` with the six answers and the caller's number. A `high`
+verdict tags the contact `screen=prank-suspected` and asks, kindly, whether
+this is really happening; 1 clears the tag (`untag-screen`) and the call
+continues as any other, so a wrong guess leaves no mark; 2, a timeout or an
+error plays "Thanks for keeping us on our toes. Call back any time something
+goes bump." and hangs up. `tests/flows.test.ts` holds both: no path from a
+yes to "Is anyone hurt?" reaches `prank-score`, and every path through the
+tag untags it or ends the call, with one held exception: a failed
+`untag-screen` goes on with the tag set, because hanging up on a caller who
+pressed 1 is the worse outcome.
+
 ## What the flows read and write
 
 Lambda responses, read as `$.External.<key>`. Every invocation uses `JSON`
@@ -67,6 +81,7 @@ with spaces and punctuation and validation covers the whole response
 | `lambda:classify-apparition` | `canSee`, `movesObjects`, `coldSpot`, `sounds`, `touched`, `multiple`, `injured`, each `yes` or `no` | `grade` (`1` to `5`), `gradeName`, `advice`, `safety`, `crewQueue` |
 | `lambda:crew-eta`            | `district` (the slug)                                                                                 | `etaMinutes`                                                    |
 | `lambda:plane-check`         | the contact (no parameters; it reads the caller's number)                                             | `plane` (`living`, `beyond`), `reason`                          |
+| `lambda:prank-score`         | `callerNumber`, and the six answers (`canSee`, `movesObjects`, `coldSpot`, `sounds`, `touchedYou`, `multiple`) | `score`, `verdict` (`high`, `low`), `reason`               |
 
 Contact attributes, which reach whispers and later flows (flow attributes do
 not):

@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 // lambda:prank-score. A deterministic screen for October's dares, run for
-// every caller after triage (Tier 2). Invoked with ResponseType STRING_MAP.
+// every caller after triage (Tier 2). Invoked with ResponseType JSON, like
+// every stub here (VERIFY.md, row L1).
 // https://docs.aws.amazon.com/connect/latest/adminguide/connect-lambda-functions.html
 //
 // It never screens out a caller who said someone is hurt: safety first,

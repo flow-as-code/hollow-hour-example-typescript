@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 // lambda:plane-check. Decides which side of the veil a caller is on. Invoked
-// from hh-hotline-main (Tier 2) with ResponseType STRING_MAP.
+// from hh-hotline-main (Tier 2) with ResponseType JSON, like every stub here
+// (VERIFY.md, row L1).
 // https://docs.aws.amazon.com/connect/latest/adminguide/connect-lambda-functions.html
 //
 // The rule is a fixture, not a carrier lookup: numbers ending 555-0190 to

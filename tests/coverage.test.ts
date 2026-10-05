@@ -64,8 +64,10 @@ const TIER_FLOOR: Record<string, Floor> = {
     refTypes: ["flow", "hours", "lambda", "module", "queue"],
   },
   // T2 PR 2: the hold flows. PR 3: the dead line's three action types.
+  // PR 4: the prank screen's UntagContact.
   "2": {
     actionTypes: [
+      "UntagContact",
       "UpdateContactCallbackNumber",
       "UpdateContactRecordingBehavior",
       "UpdateContactRoutingBehavior",

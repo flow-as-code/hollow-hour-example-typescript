@@ -63,9 +63,15 @@ function fakeResourceMap(): Record<string, string> {
 }
 
 describe("scenarios/", () => {
-  it("holds S1 and S2", () => {
-    expect(files).toContain("s1-safety-path.scenario.json");
-    expect(files).toContain("s2-keypad-restless-old-town.scenario.json");
+  it("holds S1, S2, S3 and S5", () => {
+    for (const f of [
+      "s1-safety-path.scenario.json",
+      "s2-keypad-restless-old-town.scenario.json",
+      "s3-theos-dare.scenario.json",
+      "s5-departed-caller.scenario.json",
+    ]) {
+      expect(files).toContain(f);
+    }
   });
 
   for (const { file, scenario } of scenarios) {

@@ -80,8 +80,12 @@ const BANNED: { term: RegExp; why: string }[] = [
     term: /\bthis is an emergency (?:line|service)\b/i,
     why: "the hotline is not an emergency service",
   },
-  // The prank path stays polite (spec section 2).
+  // The prank path stays polite (spec section 2) and never accuses.
   { term: /\b(?:idiot|stupid|moron|loser|pathetic)\b/i, why: "never insults the caller" },
+  {
+    term: /\b(?:liar|lying|prank call|wasting our time|time waster)\b/i,
+    why: "the prank path never accuses the caller",
+  },
 ];
 
 describe("copy", () => {
@@ -111,6 +115,16 @@ describe("copy", () => {
   it("repeats the emergency line when the greeting module fails", () => {
     const fallback = copy.find((c) => c.where === "hh-hotline-main#fallback-greeting");
     expect(fallback?.text).toContain(EMERGENCY_LINE);
+  });
+
+  // T2 criterion 5: the prank path ends with a kind sentence, never an accusation.
+  it("ends the prank path kindly: the goodbye thanks the caller and invites them back", () => {
+    const goodbye = copy.find((c) => c.where === "hh-hotline-main#dare-goodbye");
+    expect(goodbye?.text).toMatch(/^Thanks /);
+    expect(goodbye?.text).toMatch(/Call back any time/);
+    expect(goodbye?.text).not.toMatch(/\b(?:prank|dare|fake|lie|joke)\b/i);
+    const ask = copy.find((c) => c.where === "hh-hotline-main#kind-check");
+    expect(ask?.text).toContain("that is all right");
   });
 
   it("names the local emergency number wherever it mentions 911", () => {
