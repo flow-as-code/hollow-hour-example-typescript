@@ -1020,11 +1020,13 @@ describe("the callback number", () => {
 });
 
 /**
- * A DistributeByPercentage, as the shares its branches claim: a random number
- * from 1 to 100 routed by ascending NumberLessThan thresholds, each branch
- * taking the values from the previous threshold up to its own, and the
+ * A DistributeByPercentage, as the shape that routes every value: a random
+ * number from 1 to 100 routed by ascending NumberLessThan thresholds, each
+ * branch taking the values from the previous threshold up to its own, and the
  * NoMatchingCondition remainder (which NextAction mirrors) taking the rest.
- * Returns the problems, or none when the shares sum to exactly 100.
+ * Thresholds in ascending order and at most 100 cover 1 to 100 by
+ * construction, so no sum is computed: it would be 100 for any list this
+ * accepts. Returns the problems, or none.
  */
 function percentageProblems(d: FlowDoc, a: FlowAction): string[] {
   const where = `${d.name}#${a.Identifier}`;
@@ -1035,7 +1037,6 @@ function percentageProblems(d: FlowDoc, a: FlowAction): string[] {
     out.push(`${where}: NextAction does not mirror the remainder`);
   }
   let previous = 1;
-  let claimed = 0;
   for (const c of a.Transitions.Conditions ?? []) {
     const operand = String(c.Condition.Operands[0]);
     const threshold = Number(operand);
@@ -1047,11 +1048,8 @@ function percentageProblems(d: FlowDoc, a: FlowAction): string[] {
       out.push(`${where}: threshold ${operand} is out of order or over 100`);
       continue;
     }
-    claimed += threshold - previous;
     previous = threshold;
   }
-  const total = claimed + (101 - previous);
-  if (total !== 100) out.push(`${where}: shares sum to ${String(total)}, not 100`);
   return out;
 }
 
@@ -1063,7 +1061,7 @@ describe("the hold A/B split in the queue flows", () => {
     })),
   );
 
-  it("catches a split that does not sum to 100, and one with no remainder", () => {
+  it("catches a threshold over 100, one out of order, and a split with no remainder", () => {
     const sample = splits[0];
     if (sample === undefined) throw new Error("no DistributeByPercentage");
     const over = structuredClone(sample.a);
@@ -1072,13 +1070,21 @@ describe("the hold A/B split in the queue flows", () => {
     expect(percentageProblems(sample.doc, over)).toEqual([
       `${sample.doc.name}#pick-hold-variant: threshold 101 is out of order or over 100`,
     ]);
+    const unordered = structuredClone(sample.a);
+    unordered.Transitions.Conditions?.push({
+      NextAction: "note-spoken-variant",
+      Condition: { Operator: "NumberLessThan", Operands: ["26"] },
+    });
+    expect(percentageProblems(sample.doc, unordered)).toEqual([
+      `${sample.doc.name}#pick-hold-variant: threshold 26 is out of order or over 100`,
+    ]);
     const bare = structuredClone(sample.a);
     bare.Transitions.Errors = [];
     expect(percentageProblems(sample.doc, bare)).toEqual([
       `${sample.doc.name}#pick-hold-variant: no remainder branch`,
     ]);
-    // A threshold moved: the shares still sum to 100, by construction; what
-    // moves is the split, which the even-split test below holds.
+    // A threshold moved: still the shape that routes every value; what moves
+    // is the split, which the even-split test below holds.
     const skewed = structuredClone(sample.a);
     if (skewed.Transitions.Conditions?.[0])
       skewed.Transitions.Conditions[0].Condition.Operands = ["31"];
@@ -1092,7 +1098,7 @@ describe("the hold A/B split in the queue flows", () => {
   });
 
   it.each(splits.map((s) => [`${s.doc.name}#${s.a.Identifier}`, s] as const))(
-    "%s sums to 100",
+    "%s: ascending NumberLessThan thresholds at most 100, with a mirrored remainder",
     (_where, s) => {
       expect(percentageProblems(s.doc, s.a)).toEqual([]);
     },

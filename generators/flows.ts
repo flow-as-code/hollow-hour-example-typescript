@@ -55,8 +55,10 @@
 //   contact search by tag (VERIFY DP1). hold is then a Compare on the
 //   attribute: recorded plays prompt:salt-line-tips, the one recorded audio
 //   in the set, and falls back to the spoken tips if the prompt fails;
-//   anything else plays the spoken tips. The split is even by construction
-//   (tests/flows.test.ts holds every DistributeByPercentage to 100).
+//   anything else plays the spoken tips. tests/flows.test.ts holds every
+//   DistributeByPercentage to the shape that routes every value from 1 to
+//   100 (ascending NumberLessThan thresholds at most 100, a mirrored
+//   remainder) and this one to an even split.
 
 import {
   CheckHoursOfOperation,

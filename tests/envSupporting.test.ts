@@ -202,6 +202,11 @@ describe("the recorded prompt (T2, the hold A/B split)", () => {
         expect(text).toContain(flag);
       }
       expect(text).toContain('source       = "${path.module}/../../prompts/salt-line-tips.wav"');
+      // The MD5 in the key is what carries a regenerated wav to the prompt:
+      // s3_uri changes with it, and awscc updates the prompt in place.
+      expect(text).toContain(
+        'key          = "salt-line-tips-${filemd5("${path.module}/../../prompts/salt-line-tips.wav")}.wav"',
+      );
       expect(text).toContain(
         'source_hash  = filemd5("${path.module}/../../prompts/salt-line-tips.wav")',
       );

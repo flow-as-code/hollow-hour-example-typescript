@@ -113,8 +113,10 @@ by tag (VERIFY.md, row DP1). `hold` is then a Compare on the attribute:
 (`prompts/salt-line-tips.wav`, synthesized once from
 `prompts/salt-line-tips.txt`; envs/README.md, "The recorded prompt"), and
 falls back to the spoken tips if the prompt fails; anything else plays the
-spoken tips. Which branch a run takes is not simulatable, and the split is
-held to exactly 100 by `tests/flows.test.ts`.
+spoken tips. Which branch a run takes is not simulatable;
+`tests/flows.test.ts` holds the split's shape (ascending NumberLessThan
+thresholds at most 100 with a mirrored remainder, which routes every value
+from 1 to 100 by construction) and its evenness.
 
 ## What the flows read and write
 

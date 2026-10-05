@@ -157,10 +157,8 @@ Supporting resources, per environment (`envs/{dev,qa,prod}/supporting.tf`):
 - `hashicorp/awscc` in every flow root's `providers.tf` and lockfile
   (`scripts/lock-providers.mjs`), not the seasonal roots. awscc's provider
   block has no `default_tags`, `skip_credentials_validation` or
-  `skip_requesting_account_id` (its arguments are the credentials,
-  `region`, `profile`, `role_arn`, `assume_role`, `endpoints`,
-  `max_retries`, `insecure`, `skip_metadata_api_check` and `user_agent`),
-  so the prompt carries the module's two tags itself, as `tags`, a set of
+  `skip_requesting_account_id`, so the prompt carries the module's two
+  tags itself, as `tags`, a set of
   `{key, value}` objects, not a map; a test holds the prompt's tags equal
   to the aws `default_tags`. The map key `prompt:salt-line-tips` already
   exists in every profile, bound to
@@ -237,7 +235,8 @@ Supporting resources, per environment (`envs/{dev,qa,prod}/supporting.tf`):
      call, with one held exception: if `untag-screen` itself fails, the
      caller who said it is really happening goes on with the tag set rather
      than being hung up on;
-   - every DistributeByPercentage sums to 100;
+   - every DistributeByPercentage covers 1 to 100 by its shape: ascending
+     NumberLessThan thresholds at most 100 and a mirrored remainder;
    - no Wait in any flow;
    - the district-name walk of T1 covers the dead line and the callback
      paths.
@@ -349,8 +348,10 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       wired to the sibling's queue); flows/ holds exactly one module and the
       in-set module is invoked through its live alias; and the key-use list
       drops `hours:closed` (S4 substitutes it) and the callback module. PR 7
-      adds, each with its mutation case: every DistributeByPercentage sums to
-      exactly 100 and mirrors its remainder (mutations: a threshold over 100,
+      adds, each with its mutation case: every DistributeByPercentage covers
+      1 to 100 by its shape, ascending NumberLessThan thresholds at most 100
+      with a mirrored remainder (a sum would be 100 for any such list, so
+      none is computed; mutations: a threshold over 100, one out of order,
       no remainder branch); the splits are exactly one per queue flow, even,
       on entry, each side recording and tagging `holdVariant`, and `hold` a
       Compare that plays `prompt:salt-line-tips` for `recorded` and the
@@ -379,8 +380,9 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       storage (below), `needs sandbox`; D1 added with the work order (PR 5),
       `needs sandbox`; CB1 added with the callbacks (PR 6), `needs sandbox`;
       DP1, P1 and E1 added with the prompt and the split (PR 7), each
-      `needs sandbox` (E1 is settled in the Terraform-first repository's
-      `VERIFY.md` as `harness-checked` by its mirror of PR 7).
+      `needs sandbox` (E1's status mirrors the Terraform-first repository's
+      `VERIFY.md`: it moves to `harness-checked` here once its mirror of
+      PR 7 records one there).
 - [ ] Recording storage (tier decision 5), checked 2026-10-05 at 17:25 UTC:
       `list-instance-storage-configs` for CALL_RECORDINGS returned `[]` on
       dev, qa and prod (all us-east-1), so `envs/bootstrap/recordings.tf`

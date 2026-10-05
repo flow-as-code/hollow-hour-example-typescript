@@ -147,9 +147,17 @@ resource "aws_connect_queue" "shared" {
 # every profile binds as prompt:salt-line-tips. The audio is synthesized once
 # from prompts/salt-line-tips.txt, the copy source tests/copy.test.ts scans
 # (tasks/README.md, tier decision 4; the command is in envs/README.md). Which
-# principal reads the object at CreatePrompt, what bucket policy that needs,
-# and which audio format the service accepts are settled by the first dev
-# apply (VERIFY.md, row P1); until then the bucket carries no policy.
+# principal reads the object at CreatePrompt (the resource type's handlers
+# say the caller), what bucket policy that needs, and which audio format the
+# service accepts are settled by the first dev apply (VERIFY.md, row P1);
+# until then the bucket carries no policy.
+#
+# The object's key carries the file's MD5, so a regenerated wav changes the
+# key and with it the prompt's s3_uri: the same apply replaces the object
+# (the resource address is unchanged, so the old object is deleted) and
+# awscc updates the prompt in place (S3Uri is not a create-only property of
+# AWS::Connect::Prompt), keeping prompt_arn and every flow binding. A fixed
+# key would re-put the object and leave the prompt playing the old audio.
 # https://docs.aws.amazon.com/connect/latest/APIReference/API_CreatePrompt.html
 # https://docs.aws.amazon.com/connect/latest/adminguide/prompts.html
 
@@ -188,7 +196,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "prompts" {
 
 resource "aws_s3_object" "salt_line_tips" {
   bucket       = aws_s3_bucket.prompts.id
-  key          = "salt-line-tips.wav"
+  key          = "salt-line-tips-${filemd5("${path.module}/../../prompts/salt-line-tips.wav")}.wav"
   source       = "${path.module}/../../prompts/salt-line-tips.wav"
   source_hash  = filemd5("${path.module}/../../prompts/salt-line-tips.wav")
   content_type = "audio/wav"
