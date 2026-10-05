@@ -7,7 +7,15 @@
 # managed KMS key (the storage config's encryption block is optional, and a
 # customer key is a monthly charge), public access blocked, ACLs disabled,
 # and a lifecycle rule that expires recordings after 30 days. The bucket is
-# in the instance's own Region.
+# in the instance's own Region, and its name starts with `amazon-connect-`:
+# that prefix is the only S3 grant the instance's service-linked role
+# carries (AmazonConnectServiceLinkedRolePolicy, read on 2026-10-05 as v56:
+# object actions on the S3 resource `amazon-connect-*/*`, GetBucketLocation and
+# GetBucketAcl on the bucket `amazon-connect-*`), the service-linked role
+# guide lists no inline policy for a recording bucket, and this root adds no
+# bucket policy, so any other name would rely on undocumented behavior.
+# https://docs.aws.amazon.com/connect/latest/adminguide/security_iam_awsmanpol.html#amazonconnectservicelinkedrolepolicy
+# https://docs.aws.amazon.com/connect/latest/adminguide/connect-slr.html
 # https://docs.aws.amazon.com/connect/latest/APIReference/API_AssociateInstanceStorageConfig.html
 # https://docs.aws.amazon.com/connect/latest/adminguide/update-instance-settings.html
 # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/connect_instance_storage_config
@@ -16,7 +24,7 @@ resource "aws_s3_bucket" "recordings" {
   for_each = var.environments
 
   region = each.value
-  bucket = "hollow-hour-example-${each.key}-recordings-${random_id.suffix.hex}"
+  bucket = "amazon-connect-hollow-hour-example-${each.key}-recordings-${random_id.suffix.hex}"
 
   tags = {
     "environment" = each.key

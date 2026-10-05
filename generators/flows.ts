@@ -321,7 +321,7 @@ export function queueExperienceFlow(d: District, districts: readonly District[])
       ],
       interruptFrequencySeconds: HOLD_INTERRUPT_SECONDS,
       onInterrupt: "poll-crews",
-      onError: "done",
+      onError: "settle-in",
     }),
     new MessageParticipantIteratively({
       id: "settle-in",

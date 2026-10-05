@@ -114,7 +114,7 @@ export function hhQueueExperienceGraveyardHill(): Flow {
       ],
       interruptFrequencySeconds: 30,
       onInterrupt: "poll-crews",
-      onError: "done",
+      onError: "settle-in",
     }),
     new MessageParticipantIteratively({
       id: "settle-in",

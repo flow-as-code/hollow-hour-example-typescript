@@ -57,7 +57,7 @@
           "Errors": [
             {
               "ErrorType": "NoMatchingError",
-              "NextAction": "done"
+              "NextAction": "settle-in"
             }
           ],
           "Conditions": [
@@ -87,37 +87,27 @@
           "Errors": [],
           "Conditions": []
         }
-      },
-      {
-        "Identifier": "done",
-        "Type": "EndFlowExecution",
-        "Parameters": {},
-        "Transitions": {}
       }
     ]
   },
   "layout": {
-    "done": {
-      "x": 540,
-      "y": 20
-    },
     "keep-vigil": {
       "x": 20,
       "y": 20
     },
     "reassure": {
       "x": 280,
-      "y": 120
+      "y": 20
     },
     "settle-in": {
-      "x": 280,
+      "x": 540,
       "y": 20
     }
   },
   "refs": [],
   "meta": {
     "generator": "cli@0.2.1",
-    "sourceHash": "sha256:5115622d4ec5e3fd6305944a32228dffd0ca07991edd2ede232f3e879e581fbf",
+    "sourceHash": "sha256:09ca57ceaab91bdc48ac97fc6937d26e70fed61e2d2b53d76e40e0d606dd498e",
     "sourceKind": "ts"
   }
 }

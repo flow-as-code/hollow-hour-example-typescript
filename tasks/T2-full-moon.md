@@ -323,7 +323,15 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       dev, qa and prod (all us-east-1), so `envs/bootstrap/recordings.tf`
       adds one private SSE-S3 bucket, a 30-day expiry rule and the storage
       config per instance (PR 3), to be applied by the operator at the
-      Close, after which this line records the apply with its time.
+      Close, after which this line records the apply with its UTC time and
+      whether `iam list-role-policies` on each instance's service-linked
+      role shows a policy the service added. The buckets take the
+      `amazon-connect-` prefix, the only S3 resource the role's managed
+      policy grants (read 2026-10-05, v56; RS1), so the write relies on
+      nothing undocumented. The apply creates 18 resources with no standing
+      charge; a recording is billed at S3 standard storage once one exists,
+      none will until a call reaches an agent (no claimed number, no agent
+      user in this tier), and the 30-day expiry caps the exposure.
 - [ ] 1, 2, 6: held by `npm run check` and the emit tests at each PR; the
       Terraform-first side of 1 waits on the mirror.
 - [ ] 5, 7, 10: not started.
@@ -464,6 +472,14 @@ awscc_connect_prompt.salt_line_tips.prompt_arn`) and `hh-district-menu.tf`.
   the district-name walk of criterion 4 needs a name to hold
   `queue:the-dead` to; without it the walk would pass the dead line
   vacuously.
+- **A queue flow's loop error falls to the loop that keeps speaking** (PR 3,
+  review). `hh-dead-queue-experience` routed `reassure`'s error to an
+  EndFlowExecution, as T1's `hh-queue-experience-<slug>` routed `hold`'s;
+  a customer queue flow that ends leaves the caller in queue with nothing
+  further from it, the nearest thing to a silent dead end in the set. Both
+  now fall to `settle-in`, the no-interrupt loop, and the dead line's queue
+  flow has no end block at all. The generated flows keep `done` for the
+  callback path.
 - **A VERIFY row the plan did not list, RS1** (PR 3): the recording storage
   config with no customer managed key is a Connect behavior newly relied on
   (CONTRIBUTING.md), so it has a row beside HC1.

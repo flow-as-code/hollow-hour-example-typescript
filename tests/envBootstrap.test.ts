@@ -75,13 +75,21 @@ describe("envs/bootstrap", () => {
 
   // Tier decision 5 (tasks/README.md): on 2026-10-05 no instance had a
   // CALL_RECORDINGS storage config, so bootstrap adds one per environment.
+  // The bucket name takes the amazon-connect- prefix because that is the
+  // only S3 resource the service-linked role's managed policy grants, and
+  // the root adds no bucket policy (VERIFY.md, RS1).
   it("stores call recordings in a private SSE-S3 bucket per environment, expired after 30 days, with no customer key", () => {
     const bucket = block("aws_s3_bucket", "recordings");
     expect(bucket).toContain("for_each = var.environments");
     expect(bucket).toContain("region = each.value");
     expect(bucket).toContain(
-      'bucket = "hollow-hour-example-${each.key}-recordings-${random_id.suffix.hex}"',
+      'bucket = "amazon-connect-hollow-hour-example-${each.key}-recordings-${random_id.suffix.hex}"',
     );
+    // 63 characters is the S3 limit; the longest environment name is prod.
+    expect("amazon-connect-hollow-hour-example-prod-recordings-".length + 6).toBeLessThanOrEqual(
+      63,
+    );
+    expect(text).not.toContain("aws_s3_bucket_policy");
     expect(block("aws_s3_bucket_server_side_encryption_configuration", "recordings")).toContain(
       'sse_algorithm = "AES256"',
     );

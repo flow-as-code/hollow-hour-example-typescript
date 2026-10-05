@@ -51,11 +51,22 @@ creates one call recording bucket per instance (private, SSE-S3, no customer
 managed key, recordings expired after 30 days) and the instance's
 CALL_RECORDINGS storage config (`recordings.tf`): on 2026-10-05 (17:25 UTC)
 no instance had one, so nothing the flows' recording blocks captured was
-stored (tasks/README.md, tier decision 5; VERIFY.md, RS1). The credentials
-that apply the root need `s3:*Bucket*`, `s3:Put*` on those buckets and
-`connect:AssociateInstanceStorageConfig`, `DescribeInstanceStorageConfig`,
-`UpdateInstanceStorageConfig`, `DisassociateInstanceStorageConfig` on the
-instances. The Regions default to
+stored (tasks/README.md, tier decision 5; VERIFY.md, RS1). The buckets are
+named `amazon-connect-hollow-hour-example-<environment>-recordings-<suffix>`,
+because `amazon-connect-*` is the only S3 resource the instance's
+service-linked role is granted and the root adds no bucket policy. The apply
+creates 18 resources with no standing charge: a recording is billed at S3
+standard storage once one exists, none will until a call reaches an agent
+(no claimed number and no agent user in this tier), and the 30-day expiry
+caps the exposure. The credentials that apply the root need, on those three
+buckets, `s3:CreateBucket`, `s3:ListBucket`, `s3:PutBucketTagging`,
+`s3:PutEncryptionConfiguration`, `s3:PutBucketPublicAccessBlock`,
+`s3:PutBucketOwnershipControls`, `s3:PutLifecycleConfiguration` and `s3:Get*`
+(the `aws_s3_bucket` refresh reads every bucket configuration, the others
+their own), `s3:DeleteBucket` only if the same credentials are to destroy
+them, and `connect:AssociateInstanceStorageConfig`,
+`DescribeInstanceStorageConfig`, `UpdateInstanceStorageConfig`,
+`DisassociateInstanceStorageConfig` on the instances. The Regions default to
 this repository's own (dev, qa, prod and the bucket all `us-east-1`; the
 Terraform-first repository keeps its three in `us-west-2`, so the two never
 share a Region); override them with `-var` or `TF_VAR_environments` and

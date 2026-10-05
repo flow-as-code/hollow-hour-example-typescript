@@ -498,7 +498,13 @@ function deadLineProblems(d: FlowDoc): string[] {
   if (reachesWithout(d, d.content.StartAction, "set-dead-queue", "set-patience")) {
     out.push("the target queue is set before the routing adjustment");
   }
-  const hooks = d.content.Actions.filter((a) => a.Type === "UpdateContactEventHooks");
+  // Only hook blocks on a path from the start count: one that exists but is
+  // wired past sets nothing for the Queue of the Dead.
+  const hooks = d.content.Actions.filter(
+    (a) =>
+      a.Type === "UpdateContactEventHooks" &&
+      reachesWithout(d, d.content.StartAction, a.Identifier, ""),
+  );
   const set = Object.assign({}, ...hooks.map((a) => a.Parameters.EventHooks)) as Record<
     string,
     string
@@ -581,10 +587,17 @@ describe("hh-dead-line", () => {
     ]);
   });
 
-  it("catches a missing or doubled hook", () => {
+  it("catches a hook wired past, missing or doubled", () => {
     const missing = structuredClone(dead);
-    action(missing, "set-dead-whisper").Transitions.NextAction = "set-dead-queue-experience";
-    expect(deadLineProblems(missing)).toEqual([]);
+    const whisper = action(missing, "set-dead-whisper");
+    whisper.Transitions.NextAction = "set-dead-queue-experience";
+    whisper.Transitions.Errors = [
+      { ErrorType: "NoMatchingError", NextAction: "set-dead-queue-experience" },
+    ];
+    // The block is still there, and still sets nothing.
+    expect(deadLineProblems(missing)).toEqual([
+      "CustomerHold is undefined, expected ${cdref:flow:hh-dead-hold}",
+    ]);
     missing.content.Actions = missing.content.Actions.filter(
       (a) => a.Identifier !== "set-dead-hold",
     );
@@ -606,10 +619,10 @@ describe("hooked flows never point back", () => {
         flow: /^\$\{cdref:flow:(.+)\}$/.exec(flow)?.[1] ?? flow,
       })),
     );
-  const problems = (d: FlowDoc) =>
+  const problems = (d: FlowDoc, set: ReadonlyMap<string, FlowDoc> = byName) =>
     hookTargets(d).flatMap(({ block, flow }) => {
       if (flow === d.name) return [`${d.name}#${block}: hooks itself`];
-      const target = byName.get(flow);
+      const target = set.get(flow);
       if (target === undefined)
         return [`${d.name}#${block}: hooks ${flow}, which is not in the set`];
       const back = collectRefs(target.content).some((r) => r.type === "flow" && r.name === d.name);
@@ -621,6 +634,23 @@ describe("hooked flows never point back", () => {
     (action(d, "set-dead-whisper").Parameters.EventHooks as Record<string, string>).AgentWhisper =
       "${cdref:flow:hh-dead-line}";
     expect(problems(d)).toEqual(["hh-dead-line#set-dead-whisper: hooks itself"]);
+  });
+
+  // The branch VERIFY 16.3 is about: a hooked flow that references its
+  // caller cycles the resource graph.
+  it("would notice a hooked flow that references its caller back", () => {
+    const whisper = structuredClone(doc("hh-dead-whisper"));
+    whisper.content.Actions.push({
+      Identifier: "back-to-the-line",
+      Type: "TransferToFlow",
+      Parameters: { ContactFlowId: "${cdref:flow:hh-dead-line}" },
+      Transitions: {},
+    });
+    const set = new Map(byName);
+    set.set("hh-dead-whisper", whisper);
+    expect(problems(doc("hh-dead-line"), set)).toEqual([
+      "hh-dead-line#set-dead-whisper: hooks hh-dead-whisper, which references hh-dead-line back",
+    ]);
   });
 
   it.each(flows.map((l) => l.doc.name))("%s", (name) => {
@@ -690,6 +720,19 @@ describe("hh-dead-queue-experience", () => {
     ]) {
       expect(t.has(banned), banned).toBe(false);
     }
+  });
+
+  // A queue flow that ends leaves the caller in queue with nothing further
+  // from it, so an error in the interruptible loop falls to the loop that
+  // keeps speaking, never to an end. The generated queue flows do the same.
+  it("keeps speaking when the interruptible loop errors, and never ends", () => {
+    expect((action(q, "reassure").Transitions.Errors ?? []).map((e) => e.NextAction)).toEqual([
+      "settle-in",
+    ]);
+    expect(action(q, "keep-vigil").Transitions.Conditions?.map((c) => c.NextAction)).toContain(
+      "settle-in",
+    );
+    expect(types(q).has("EndFlowExecution")).toBe(false);
   });
 });
 
@@ -866,6 +909,9 @@ describe("generated district flows", () => {
         },
       ]);
       expect(action(queue, "poll-crews").Parameters.LoopCount).toBe("3");
+      // An error in the loop falls to the loop that keeps speaking, never to
+      // the end: a queue flow that ends leaves the caller with nothing more.
+      expect((hold.Transitions.Errors ?? []).map((e) => e.NextAction)).toEqual(["settle-in"]);
     });
   }
 });
