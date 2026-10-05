@@ -14,8 +14,11 @@ Planned 2026-10-04. Nothing below is built yet.
 
 - **flow-as-code C03** (channel-restricted actions) decides how a chat-only
   flow lints. Wait and ShowView are chat-only by channel, and C03 adds a
-  warning for them; criterion 2 below needs its outcome, so PR 5 waits for
-  C03 to be released and the pins to move to that release.
+  warning for them; criterion 2 below needs its outcome, so PR 5 (the chat
+  flow) waits for the release that carries C03, which is C11 (Phase C has
+  no per-task release), and moves the pins to it. PRs 1 to 4 proceed on
+  0.2.1; the tier as a whole does not wait (settled 2026-10-05; PR 1 had
+  read as if it did).
 - **Tier decisions** 1 to 3 in [README.md](README.md) (phone number, Lex,
   agent users) are settled before PR 2.
 - **Lex** is all three environments or none (the environments differ only in
@@ -129,8 +132,8 @@ Placement rules this tier keeps:
 
 ## Pull requests, in order
 
-1. **Decisions and gates**: tier decisions 1 to 3 recorded as settled, C03's
-   outcome recorded here, pins moved to the release that carries it.
+1. **Decisions and gates**: tier decisions 1 to 3 recorded as settled, and
+   C03's outcome recorded here if it is known; the pins move in PR 5.
 2. **Users and routing**: routing profile, Bo, `queue:crew-bo`, the
    agent-queue route in the hotline; U1 (the user half).
 3. **Transfer flows and quick connects**: `hh-transfer-to-bo`,
@@ -138,7 +141,8 @@ Placement rules this tier keeps:
    S10.
 4. **Outbound whisper**: `hh-callback-whisper` and `outbound_caller_config`
    on the queues; OW1.
-5. **The chat field guide**: the view, `hh-field-guide-chat`; V1; S9.
+5. **The chat field guide**: pins moved to the flow-as-code release that
+   carries C03 (C11), the view, `hh-field-guide-chat`; V1; S9.
 6. **Drift and adopt**: S12 and README "Scene 3".
 7. **Lex**, if gated in: the bot, alias and association in all three
    environments, `lex-interview`; LX1; S11. If not, the coverage test names

@@ -14,8 +14,8 @@ directory is the record of how anything got the way it is.
 | T4  | Full coverage | 4    | [T4-full-coverage.md](T4-full-coverage.md) |
 
 T2 to T4 were planned on 2026-10-04 and are not started. T3 starts after the
-season and after flow-as-code C03 is released; T4 follows flow-as-code's
-Phase D releases. Each file carries a "Terraform-first" section with what
+season; only its chat-flow PR waits for the flow-as-code release that
+carries C03 (C11). T4 follows flow-as-code's Phase D release (D10). Each file carries a "Terraform-first" section with what
 [hollow-hour-example-terraform](https://github.com/flow-as-code/hollow-hour-example-terraform)
 mirrors; that repository's `tasks/README.md` points here rather than keeping
 a second copy of the criteria.
@@ -67,8 +67,10 @@ and the confirmation is recorded here with its date.
    If it goes in, voice in `hh-hotline-main` as the manifest names it (a
    "press 3" path beside the keypad baseline), which simulate can run
    without a phone number; chat in the field guide is the cheaper fallback.
-   In by about 2026-10-15 as T2.x, otherwise T3 PR 7 or the one recorded
-   gap.
+   In as T2.x if a dev bot works before T2 closes, otherwise T3 PR 7 or
+   the one recorded gap. (The earlier "about 2026-10-15" was a calendar
+   guess; the date that matters is T2's close, and C10's Lex substitution,
+   if simulate is to run it, ships with flow-as-code C11.)
 3. **Agent users.** Default: one user `bo` per environment
    (`hh-<env>-bo` here, `hh-tf-<env>-bo` in the Terraform-first repository),
    CONNECT_MANAGED, password from `random_password` with
@@ -84,7 +86,13 @@ and the confirmation is recorded here with its date.
    `aws connect list-instance-storage-configs --resource-type
 CALL_RECORDINGS` at T2 PR 3, and add an `aws_connect_instance_storage_config`
    with its bucket in `envs/bootstrap` (and in the Terraform-first
-   `instance.tf`) where none exists. Recorded with its date either way.
+   `instance.tf`) where none exists. The S3 config uses SSE-S3 and no
+   customer KMS key (the storage config's encryption block is optional, and
+   a customer-managed key is a monthly charge,
+   https://aws.amazon.com/kms/pricing/), and a lifecycle rule expires
+   recordings after 30 days. Three buckets here and three in the
+   Terraform-first repository, beside the three prompt buckets each.
+   Recorded with its date either way.
 6. **Queue for the in-queue callback.** Default, weighed against the design's choice of the crew queue: `queue:dispatch-overflow`
    for both callback paths, not the caller's crew queue. The design's case
    for the crew queue was that the caller leaves it, so the cap nets out.
@@ -97,6 +105,15 @@ CALL_RECORDINGS` at T2 PR 3, and add an `aws_connect_instance_storage_config`
    every callback also makes the test a single rule. The cost, a callback
    answered by dispatch rather than the district crew, is covered by the
    district attributes the callback carries (VERIFY CB1 checks that).
+   Carve-out (2026-10-05): the offer is never made at `lines-busy`, the
+   QueueAtCapacity target of `transfer-to-dispatch`, because that branch is
+   reached exactly when dispatch-overflow is full and 16.2 says a callback
+   into a full queue takes the error branch; the district flow's sibling-
+   crew-full path gets its own `overflow-full` block with the offer, and
+   the module's `create-callback` error branch has its own copy. Every S4
+   run ends with an operator sweep (`SearchContacts`, `StopContact`) for
+   leaked callbacks, since two of them fill dispatch-overflow's cap of 2
+   in dev and qa.
 7. **Terraform-first tracking.** Default: that repository gets a short
    `tasks/README.md` that points to these task files, and each task file
    here carries a "Terraform-first" section with that repository's specifics
