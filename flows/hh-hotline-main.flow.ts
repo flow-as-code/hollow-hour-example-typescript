@@ -276,7 +276,7 @@ export function hhHotlineMain(): Flow {
       },
       responseType: "JSON",
       next: "record-grade",
-      onError: "hand-to-dispatch",
+      onError: "note-ungraded",
     }),
     new UpdateContactAttributes({
       id: "record-grade",
@@ -286,7 +286,7 @@ export function hhHotlineMain(): Flow {
         gradeName: "$.External.gradeName",
       },
       next: "share-advice",
-      onError: "hand-to-dispatch",
+      onError: "note-ungraded",
     }),
     new MessageParticipant({
       id: "share-advice",
@@ -363,6 +363,12 @@ export function hhHotlineMain(): Flow {
       next: "hang-up",
       onQueueAtCapacity: "hand-to-dispatch",
       onError: "apologize",
+    }),
+    new UpdateContactAttributes({
+      id: "note-ungraded",
+      attributes: { gradeName: "Ungraded" },
+      next: "hand-to-dispatch",
+      onError: "hand-to-dispatch",
     }),
     new MessageParticipant({
       id: "hand-to-dispatch",

@@ -429,3 +429,12 @@ awscc_connect_prompt.salt_line_tips.prompt_arn`) and `hh-district-menu.tf`.
   plan states it (tiers 1 and 2, scenario substitutes, the dated
   `UNUSED_UNTIL` list naming each gate) and the list shrinks as PRs 3 to 8
   land. `hours:the-dead` is never on the list: S2 names it as a substitute.
+- **`hh-hotline-main` names the grade `Ungraded` before the dispatch
+  fallback** (PR 2, review). `hh-agent-hold` speaks `$.Attributes.gradeName`
+  unconditionally, and `hh-agent-whisper` already did, but the dispatch chain
+  is reached from a failed `classify` or `record-grade` with no grade set, so
+  the hold read "Grade ." there. A `note-ungraded` block on those two error
+  branches sets `gradeName` to `Ungraded` before `hand-to-dispatch`; the
+  at-capacity path from the Lantern Crew keeps the grade it has. The
+  generated flows need no copy: `hh-district-menu` is reached only through
+  `record-grade`.

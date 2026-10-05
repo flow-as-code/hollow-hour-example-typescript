@@ -59,7 +59,7 @@ not):
 | ------------------------------ | --------------------------------------- | ------------------------------------ |
 | `season`                       | the greeting module                     | `hh-hotline-main` (the `season` tag) |
 | `callerName`, `callerStatus`   | `hh-hotline-main`                       | `hh-hotline-main` (welcome back)     |
-| `grade`, `gradeName`, `advice` | `hh-hotline-main` (from the classifier) | `hh-hotline-main`, `hh-agent-whisper`, `hh-agent-hold` |
+| `grade`, `gradeName`, `advice` | `hh-hotline-main` (from the classifier; `gradeName` is `Ungraded` on the dispatch fallback from a failed classification) | `hh-hotline-main`, `hh-agent-whisper`, `hh-agent-hold` |
 | `district`, `districtName`     | `hh-district-menu`; rewritten by `hh-district-<slug>` before an overflow, by `hh-queue-experience-<slug>` before a move, and by `hh-hotline-main` for the Lantern Crew and dispatch | both whispers, `hh-customer-hold`, the queue flows' copy |
 | `moved`                        | `hh-queue-experience-<slug>` (`true` before a move, `false` if it fails) | `hh-queue-experience-<slug>` (skips the offer) |
 

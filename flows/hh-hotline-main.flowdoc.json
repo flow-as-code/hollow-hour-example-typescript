@@ -829,7 +829,7 @@
           "Errors": [
             {
               "ErrorType": "NoMatchingError",
-              "NextAction": "hand-to-dispatch"
+              "NextAction": "note-ungraded"
             }
           ],
           "Conditions": []
@@ -851,7 +851,7 @@
           "Errors": [
             {
               "ErrorType": "NoMatchingError",
-              "NextAction": "hand-to-dispatch"
+              "NextAction": "note-ungraded"
             }
           ],
           "Conditions": []
@@ -1099,6 +1099,26 @@
             {
               "ErrorType": "NoMatchingError",
               "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "note-ungraded",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "gradeName": "Ungraded"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "hand-to-dispatch",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hand-to-dispatch"
             }
           ],
           "Conditions": []
@@ -1438,6 +1458,10 @@
       "x": 6000,
       "y": 20
     },
+    "note-ungraded": {
+      "x": 7300,
+      "y": 120
+    },
     "offer-end-or-continue": {
       "x": 3140,
       "y": 20
@@ -1598,7 +1622,7 @@
   ],
   "meta": {
     "generator": "cli@0.2.1",
-    "sourceHash": "sha256:11b27aad14a353062427817d75e7f3fe32319da99bc4293aad41865a5d141ad2",
+    "sourceHash": "sha256:84124f9efe438876115f5d1506a6111fbbbfd7d911c9ed031d9f020f4743dd5a",
     "sourceKind": "ts"
   }
 }

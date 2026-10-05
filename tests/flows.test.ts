@@ -354,6 +354,26 @@ describe("hh-hotline-main", () => {
     }
   });
 
+  // The agent whisper and hold speak $.Attributes.gradeName, and the dispatch
+  // fallback is the one chain an ungraded caller can reach (the classifier
+  // failed, or the grade could not be recorded), so those two paths name a
+  // grade on the way. A full Lantern Crew keeps the grade it has.
+  it("names the grade Ungraded on the way to dispatch when the classifier failed, and only then", () => {
+    for (const id of ["classify", "record-grade"]) {
+      expect((action(main, id).Transitions.Errors ?? []).map((e) => e.NextAction)).toEqual([
+        "note-ungraded",
+      ]);
+    }
+    const note = action(main, "note-ungraded");
+    expect(note.Type).toBe("UpdateContactAttributes");
+    expect(note.Parameters.Attributes).toEqual({ gradeName: "Ungraded" });
+    expect(note.Transitions.NextAction).toBe("hand-to-dispatch");
+    expect(action(main, "transfer-to-lantern").Transitions.Errors).toContainEqual({
+      ErrorType: "QueueAtCapacity",
+      NextAction: "hand-to-dispatch",
+    });
+  });
+
   it("invokes its Lambdas with JSON response validation (VERIFY L1)", () => {
     for (const id of ["look-up-caller", "classify"]) {
       expect(action(main, id).Parameters.ResponseValidation).toEqual({ ResponseType: "JSON" });
