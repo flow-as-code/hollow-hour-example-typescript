@@ -66,6 +66,7 @@ try {
   mkdirSync(join(tree, "envs"), { recursive: true });
   copyFileSync(join(ROOT, "districts.config.json"), join(tree, "districts.config.json"));
   cpSync(join(ROOT, "lambdas"), join(tree, "lambdas"), { recursive: true });
+  cpSync(join(ROOT, "prompts"), join(tree, "prompts"), { recursive: true });
 
   for (const root of ROOTS) {
     const dir = join(tree, "envs", root.name);

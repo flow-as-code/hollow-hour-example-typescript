@@ -47,6 +47,12 @@ const lambdaCopy = readdirSync(joinPath(ROOT, "lambdas"), { withFileTypes: true 
   });
 copy.push(...lambdaCopy);
 
+// The recorded prompt's copy: prompts/salt-line-tips.txt is what Polly read
+// to make prompts/salt-line-tips.wav (tasks/README.md, tier decision 4), so
+// the text is scanned like anything else a caller hears.
+const PROMPT_TEXT = readFileSync(joinPath(ROOT, "prompts", "salt-line-tips.txt"), "utf8").trim();
+copy.push({ where: "prompts/salt-line-tips.txt", text: PROMPT_TEXT });
+
 // Split so the words themselves appear nowhere but here, as tests/hygiene does.
 const join = (...parts: string[]) => parts.join("");
 const BANNED: { term: RegExp; why: string }[] = [
@@ -91,6 +97,21 @@ const BANNED: { term: RegExp; why: string }[] = [
 describe("copy", () => {
   it("reads every document's copy, so an empty scan cannot pass", () => {
     expect(copy.length).toBeGreaterThan(40);
+  });
+
+  it("reads the recorded prompt's text, and the audio beside it is 8 kHz 16-bit mono wav", () => {
+    expect(PROMPT_TEXT.length).toBeGreaterThan(40);
+    expect(copy.some((c) => c.where === "prompts/salt-line-tips.txt")).toBe(true);
+    // The RIFF header: PCM (format 1), one channel, 8000 Hz, 16 bits a sample,
+    // the shape Connect recommends for a prompt (VERIFY.md, row P1).
+    const wav = readFileSync(joinPath(ROOT, "prompts", "salt-line-tips.wav"));
+    expect(wav.subarray(0, 4).toString("ascii")).toBe("RIFF");
+    expect(wav.subarray(8, 12).toString("ascii")).toBe("WAVE");
+    expect(wav.readUInt16LE(20)).toBe(1);
+    expect(wav.readUInt16LE(22)).toBe(1);
+    expect(wav.readUInt32LE(24)).toBe(8000);
+    expect(wav.readUInt16LE(34)).toBe(16);
+    expect(wav.length).toBeLessThan(50 * 1024 * 1024);
   });
 
   it("reads the Lambdas' spoken strings too", () => {

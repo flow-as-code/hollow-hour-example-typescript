@@ -55,6 +55,7 @@ const EXPECTED_PINS: Record<string, string> = {
   "actions/checkout": "3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
   "actions/setup-node": "820762786026740c76f36085b0efc47a31fe5020 # v7.0.0",
   "opentofu/setup-opentofu": "a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2",
+  "actions/cache": "55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0",
   "aws-actions/configure-aws-credentials": "e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0",
   // flow-as-code has no artifact step to match; these are the releases
   // current on 2026-09-30, their tags resolved to commits through the GitHub

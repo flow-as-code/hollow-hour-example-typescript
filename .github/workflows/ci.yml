@@ -42,10 +42,12 @@ jobs:
 
   # `tofu validate` of every root under envs/, each with the flows.tf its
   # profile emits, envs/prod with both prod and prod-october (npm run validate
-  # emits into a temporary copy itself). Downloads the aws, archive and
+  # emits into a temporary copy itself). Downloads the aws, archive, awscc and
   # flowascode providers from the registry, checked against the committed lock
   # files, which is the only network this workflow uses. 1.10 is the
-  # flowascode provider's OpenTofu floor.
+  # flowascode provider's OpenTofu floor. The awscc package is hundreds of
+  # megabytes, so the plugin directory npm run validate fills (.tofu-cache/)
+  # is kept between runs, keyed on the lock files that pin every build.
   validate:
     name: validate / tofu 1.10
     runs-on: ubuntu-latest
@@ -60,5 +62,9 @@ jobs:
         with:
           tofu_version: ~1.10.0
           tofu_wrapper: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tofu-cache
+          key: tofu-plugins-${{ runner.os }}-${{ hashFiles('envs/*/.terraform.lock.hcl') }}
       - run: npm ci
       - run: npm run validate

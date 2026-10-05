@@ -104,6 +104,7 @@ describe.runIf(gate)(`tofu validate (${version ?? "no tofu"})`, () => {
     mkdirSync(join(tree, "envs"), { recursive: true });
     copyFileSync(join(ROOT, "districts.config.json"), join(tree, "districts.config.json"));
     cpSync(join(ROOT, "lambdas"), join(tree, "lambdas"), { recursive: true });
+    cpSync(join(ROOT, "prompts"), join(tree, "prompts"), { recursive: true });
 
     let flows = join(work, "flows");
     let seasonal = join(work, "seasonal");

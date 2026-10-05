@@ -104,6 +104,18 @@ says the wait is `later`, errors back to the hold, and ends the taken
 callback with DisconnectParticipant rather than EndFlowExecution, so no
 caller is both queued and holding a callback.
 
+The hold A/B split: on entry, every `hh-queue-experience-<slug>` runs
+`pick-hold-variant` (DistributeByPercentage, 50/50), and each side records
+`holdVariant` (`spoken` or `recorded`) as a contact attribute and tags the
+contact with it, so which hold a caller heard is readable in contact search
+by tag (VERIFY.md, row DP1). `hold` is then a Compare on the attribute:
+`recorded` plays `prompt:salt-line-tips`, the one recorded audio in the set
+(`prompts/salt-line-tips.wav`, synthesized once from
+`prompts/salt-line-tips.txt`; envs/README.md, "The recorded prompt"), and
+falls back to the spoken tips if the prompt fails; anything else plays the
+spoken tips. Which branch a run takes is not simulatable, and the split is
+held to exactly 100 by `tests/flows.test.ts`.
+
 ## What the flows read and write
 
 Lambda responses, read as `$.External.<key>`. Every invocation uses `JSON`
@@ -129,6 +141,7 @@ not):
 | `grade`, `gradeName`, `advice` | `hh-hotline-main` (from the classifier; `gradeName` is `Ungraded` on the dispatch fallback from a failed classification); `gradeName` is `Departed` from `hh-dead-line` | `hh-hotline-main` (the advice and the work order), `hh-agent-whisper`, `hh-agent-hold` |
 | `district`, `districtName`     | `hh-district-menu`; rewritten by `hh-district-<slug>` before an overflow, by `hh-queue-experience-<slug>` before a move, by `hh-hotline-main` for the Lantern Crew and dispatch, and by `hh-dead-line` (`beyond`, `Beyond`) | both whispers, `hh-customer-hold`, the queue flows' copy |
 | `moved`                        | `hh-queue-experience-<slug>` (`true` before a move, `false` if it fails) | `hh-queue-experience-<slug>` (skips the offer) |
+| `holdVariant`                  | `hh-queue-experience-<slug>` (`spoken` or `recorded`, on entry; tagged too) | `hh-queue-experience-<slug>` (which hold plays) |
 
 The interview answers are flow attributes of `hh-hotline-main`, passed to the
 classifier and nowhere else. `overflowCrew` is a flow attribute of each

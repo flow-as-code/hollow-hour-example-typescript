@@ -49,6 +49,14 @@
 //   invoke a module, so it inlines the same two blocks when crew-eta says the
 //   wait is long, and ends that path with DisconnectParticipant, never
 //   EndFlowExecution, so no caller is both queued and holding a callback.
+// - The hold A/B split: pick-hold-variant (DistributeByPercentage, 50/50) runs
+//   once on entry to the queue flow, and each side records holdVariant as a
+//   contact attribute and tags the contact with it, so a run is readable in
+//   contact search by tag (VERIFY DP1). hold is then a Compare on the
+//   attribute: recorded plays prompt:salt-line-tips, the one recorded audio
+//   in the set, and falls back to the spoken tips if the prompt fails;
+//   anything else plays the spoken tips. The split is even by construction
+//   (tests/flows.test.ts holds every DistributeByPercentage to 100).
 
 import {
   CheckHoursOfOperation,
@@ -57,6 +65,7 @@ import {
   CreateCallbackContact,
   DequeueContactAndTransferToQueue,
   DisconnectParticipant,
+  DistributeByPercentage,
   EndFlowExecution,
   Flow,
   GetMetricData,
@@ -67,6 +76,7 @@ import {
   MessageParticipant,
   MessageParticipantIteratively,
   Refs,
+  TagContact,
   TransferContactToQueue,
   TransferToFlow,
   UpdateContactAttributes,
@@ -90,6 +100,11 @@ export const MOVE_INTERRUPT_SECONDS = 5;
 export const HOLD_INTERRUPT_SECONDS = 30;
 /** How many times the queue flow polls before it settles into the long hold. */
 export const POLL_ROUNDS = 3;
+
+/** Each side of the hold A/B split, as the contact attribute and tag value it sets. */
+export const HOLD_VARIANTS = ["spoken", "recorded"] as const;
+/** The share of callers who hear the spoken tips; the rest hear the recorded prompt. */
+export const SPOKEN_SHARE_PERCENT = 50;
 
 /** The callback's static schedule (VERIFY 16.2): first attempt, retries, and the gap between them. */
 export const CALLBACK_SCHEDULE = {
@@ -290,8 +305,27 @@ export function queueExperienceFlow(d: District, districts: readonly District[])
       id: "check-moved",
       value: jsonPath("$.Attributes.moved"),
       branches: [{ operator: "Equals", operands: ["true"], target: "settle-in" }],
-      onNoMatch: "poll-crews",
+      onNoMatch: "pick-hold-variant",
     }),
+    new DistributeByPercentage({
+      id: "pick-hold-variant",
+      branches: [{ percent: SPOKEN_SHARE_PERCENT, target: "note-spoken-variant" }],
+      onRemainder: "note-recorded-variant",
+    }),
+    ...HOLD_VARIANTS.flatMap((variant) => [
+      new UpdateContactAttributes({
+        id: `note-${variant}-variant`,
+        attributes: { holdVariant: variant },
+        next: `tag-${variant}-variant`,
+        onError: "poll-crews",
+      }),
+      new TagContact({
+        id: `tag-${variant}-variant`,
+        tags: { holdVariant: variant },
+        next: "poll-crews",
+        onError: "poll-crews",
+      }),
+    ]),
     new Loop({
       id: "poll-crews",
       count: POLL_ROUNDS,
@@ -418,8 +452,14 @@ export function queueExperienceFlow(d: District, districts: readonly District[])
       next: "hold",
       onError: "hold",
     }),
-    new MessageParticipantIteratively({
+    new Compare({
       id: "hold",
+      value: jsonPath("$.Attributes.holdVariant"),
+      branches: [{ operator: "Equals", operands: ["recorded"], target: "hold-recorded" }],
+      onNoMatch: "hold-spoken",
+    }),
+    new MessageParticipantIteratively({
+      id: "hold-spoken",
       messages: [
         {
           text: "While you wait: keep the lights on, keep pets close, and stay in a room with a door you can open.",
@@ -429,6 +469,13 @@ export function queueExperienceFlow(d: District, districts: readonly District[])
       interruptFrequencySeconds: HOLD_INTERRUPT_SECONDS,
       onInterrupt: "poll-crews",
       onError: "settle-in",
+    }),
+    new MessageParticipantIteratively({
+      id: "hold-recorded",
+      messages: [{ prompt: Refs.prompt("salt-line-tips") }],
+      interruptFrequencySeconds: HOLD_INTERRUPT_SECONDS,
+      onInterrupt: "poll-crews",
+      onError: "hold-spoken",
     }),
     new MessageParticipantIteratively({
       id: "settle-in",

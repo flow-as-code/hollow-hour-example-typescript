@@ -15,11 +15,11 @@
           "ComparisonValue": "$.Attributes.moved"
         },
         "Transitions": {
-          "NextAction": "poll-crews",
+          "NextAction": "pick-hold-variant",
           "Errors": [
             {
               "ErrorType": "NoMatchingCondition",
-              "NextAction": "poll-crews"
+              "NextAction": "pick-hold-variant"
             }
           ],
           "Conditions": [
@@ -33,6 +33,109 @@
               }
             }
           ]
+        }
+      },
+      {
+        "Identifier": "pick-hold-variant",
+        "Type": "DistributeByPercentage",
+        "Parameters": {},
+        "Transitions": {
+          "NextAction": "note-recorded-variant",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "note-recorded-variant"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "note-spoken-variant",
+              "Condition": {
+                "Operator": "NumberLessThan",
+                "Operands": [
+                  "51"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "note-spoken-variant",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "holdVariant": "spoken"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "tag-spoken-variant",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "poll-crews"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "tag-spoken-variant",
+        "Type": "TagContact",
+        "Parameters": {
+          "Tags": {
+            "holdVariant": "spoken"
+          }
+        },
+        "Transitions": {
+          "NextAction": "poll-crews",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "poll-crews"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "note-recorded-variant",
+        "Type": "UpdateContactAttributes",
+        "Parameters": {
+          "Attributes": {
+            "holdVariant": "recorded"
+          },
+          "TargetContact": "Current"
+        },
+        "Transitions": {
+          "NextAction": "tag-recorded-variant",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "poll-crews"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "tag-recorded-variant",
+        "Type": "TagContact",
+        "Parameters": {
+          "Tags": {
+            "holdVariant": "recorded"
+          }
+        },
+        "Transitions": {
+          "NextAction": "poll-crews",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "poll-crews"
+            }
+          ],
+          "Conditions": []
         }
       },
       {
@@ -472,6 +575,33 @@
       },
       {
         "Identifier": "hold",
+        "Type": "Compare",
+        "Parameters": {
+          "ComparisonValue": "$.Attributes.holdVariant"
+        },
+        "Transitions": {
+          "NextAction": "hold-spoken",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingCondition",
+              "NextAction": "hold-spoken"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "hold-recorded",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "recorded"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "hold-spoken",
         "Type": "MessageParticipantIteratively",
         "Parameters": {
           "InterruptFrequencySeconds": "30",
@@ -489,6 +619,37 @@
             {
               "ErrorType": "NoMatchingError",
               "NextAction": "settle-in"
+            }
+          ],
+          "Conditions": [
+            {
+              "NextAction": "poll-crews",
+              "Condition": {
+                "Operator": "Equals",
+                "Operands": [
+                  "MessagesInterrupted"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "Identifier": "hold-recorded",
+        "Type": "MessageParticipantIteratively",
+        "Parameters": {
+          "InterruptFrequencySeconds": "30",
+          "Messages": [
+            {
+              "PromptId": "${cdref:prompt:salt-line-tips}"
+            }
+          ]
+        },
+        "Transitions": {
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hold-spoken"
             }
           ],
           "Conditions": [
@@ -532,23 +693,23 @@
   },
   "layout": {
     "callback-refused": {
-      "x": 2100,
+      "x": 2880,
       "y": 220
     },
     "callback-taken": {
-      "x": 2100,
+      "x": 2880,
       "y": 120
     },
     "cannot-ring-back": {
-      "x": 1840,
+      "x": 2620,
       "y": 220
     },
     "check-eta": {
-      "x": 540,
+      "x": 1320,
       "y": 20
     },
     "check-eta-band": {
-      "x": 1060,
+      "x": 1840,
       "y": 20
     },
     "check-moved": {
@@ -556,68 +717,96 @@
       "y": 20
     },
     "check-sibling": {
-      "x": 1580,
+      "x": 2360,
       "y": 20
     },
     "create-callback": {
-      "x": 1840,
+      "x": 2620,
       "y": 120
     },
     "done": {
-      "x": 2880,
-      "y": 20
-    },
-    "hold": {
-      "x": 3400,
-      "y": 20
-    },
-    "let-go": {
-      "x": 2360,
-      "y": 120
-    },
-    "move-to-sibling": {
-      "x": 2620,
-      "y": 20
-    },
-    "moving": {
-      "x": 2360,
-      "y": 20
-    },
-    "note-move": {
-      "x": 2100,
-      "y": 20
-    },
-    "offer-callback": {
-      "x": 1320,
-      "y": 20
-    },
-    "offer-move": {
-      "x": 1840,
-      "y": 20
-    },
-    "poll-crews": {
-      "x": 280,
-      "y": 20
-    },
-    "set-callback-number": {
-      "x": 1580,
-      "y": 120
-    },
-    "settle-in": {
       "x": 3660,
       "y": 20
     },
+    "hold": {
+      "x": 4180,
+      "y": 20
+    },
+    "hold-recorded": {
+      "x": 4440,
+      "y": 20
+    },
+    "hold-spoken": {
+      "x": 4700,
+      "y": 20
+    },
+    "let-go": {
+      "x": 3140,
+      "y": 120
+    },
+    "move-to-sibling": {
+      "x": 3400,
+      "y": 20
+    },
+    "moving": {
+      "x": 3140,
+      "y": 20
+    },
+    "note-move": {
+      "x": 2880,
+      "y": 20
+    },
+    "note-recorded-variant": {
+      "x": 540,
+      "y": 20
+    },
+    "note-spoken-variant": {
+      "x": 540,
+      "y": 120
+    },
+    "offer-callback": {
+      "x": 2100,
+      "y": 20
+    },
+    "offer-move": {
+      "x": 2620,
+      "y": 20
+    },
+    "pick-hold-variant": {
+      "x": 280,
+      "y": 20
+    },
+    "poll-crews": {
+      "x": 1060,
+      "y": 20
+    },
+    "set-callback-number": {
+      "x": 2360,
+      "y": 120
+    },
+    "settle-in": {
+      "x": 4960,
+      "y": 20
+    },
     "share-eta": {
-      "x": 800,
+      "x": 1580,
       "y": 20
     },
     "sibling-full": {
-      "x": 2880,
+      "x": 3660,
       "y": 120
     },
     "stay-here": {
-      "x": 3140,
+      "x": 3920,
       "y": 20
+    },
+    "tag-recorded-variant": {
+      "x": 800,
+      "y": 20
+    },
+    "tag-spoken-variant": {
+      "x": 800,
+      "y": 120
     }
   },
   "refs": [
@@ -625,6 +814,11 @@
       "token": "${cdref:lambda:crew-eta}",
       "type": "lambda",
       "name": "crew-eta"
+    },
+    {
+      "token": "${cdref:prompt:salt-line-tips}",
+      "type": "prompt",
+      "name": "salt-line-tips"
     },
     {
       "token": "${cdref:queue:dispatch-overflow}",
@@ -639,7 +833,7 @@
   ],
   "meta": {
     "generator": "hollow-hour-example generators/districts.ts",
-    "sourceHash": "sha256:00788eb7cbd10f302c4b1dccfd6fbc9504220302425323ab39727c50c0b8a6fd",
+    "sourceHash": "sha256:2ad2ce2b5c1ccb8c6fdd62fb30ee36755959b9d8a29029f6b9800b0d9a0fe2ad",
     "sourceKind": "ts"
   }
 }

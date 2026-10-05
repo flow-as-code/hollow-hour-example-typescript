@@ -292,9 +292,11 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       names CUSTOMER_HOLD and AGENT_HOLD (PR 2) and
       UpdateContactRecordingBehavior, UpdateContactRoutingBehavior and
       UpdateContactCallbackNumber (PR 3), UntagContact (PR 4),
-      UpdateContactData (PR 5) and CreateCallbackContact (PR 6).
-      DistributeByPercentage and the `prompt` reference type join it with
-      PR 7.
+      UpdateContactData (PR 5), CreateCallbackContact (PR 6),
+      DistributeByPercentage and the `prompt` reference type (PR 7): all
+      seven action types, both hold flow types and the prompt, each with a
+      mutation case (the prompt's: every PromptId message replaced by text).
+      `ALLOWED_GENERIC` is empty.
 - [ ] 4, in part: the generic-block policy test (PR 1, `tests/flows.test.ts`,
       "generic blocks"): every companion in `flows/` and `seasonal/` writes
       no `GenericBlock` for a type the catalog models, with the mutation case
@@ -346,11 +348,22 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       district-name walk reaches the offer paths (mutation: `after-hours`
       wired to the sibling's queue); flows/ holds exactly one module and the
       in-set module is invoked through its live alias; and the key-use list
-      drops `hours:closed` (S4 substitutes it) and the callback module.
+      drops `hours:closed` (S4 substitutes it) and the callback module. PR 7
+      adds, each with its mutation case: every DistributeByPercentage sums to
+      exactly 100 and mirrors its remainder (mutations: a threshold over 100,
+      no remainder branch); the splits are exactly one per queue flow, even,
+      on entry, each side recording and tagging `holdVariant`, and `hold` a
+      Compare that plays `prompt:salt-line-tips` for `recorded` and the
+      spoken tips otherwise, the recorded loop falling back to the spoken
+      one; the prompt reference is used in the recorded variant and nowhere
+      else; and the key-use list drops `prompt:salt-line-tips`, leaving the
+      two PR 8 entries.
 - [ ] 5, in part: the new flows are under the banned-terms, phone-range and
       emergency-line checks like every other; PR 4 adds the kind ending of
       the prank path (`dare-goodbye` thanks the caller and invites them
-      back, `kind-check` says it is all right) and bans accusations.
+      back, `kind-check` says it is all right) and bans accusations. PR 7
+      scans `prompts/salt-line-tips.txt` with the same checks and reads the
+      wav's header (PCM, mono, 8 kHz, 16-bit, under 50 MB).
 - [ ] 8, in part: S1 (`scenarios/s1-safety-path.scenario.json`, PR 1), S5
       (`scenarios/s5-departed-caller.scenario.json`, PR 3), S3
       (`scenarios/s3-theos-dare.scenario.json`, PR 4) and S4
@@ -364,7 +377,10 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       shapes, each with positive and negative cases (PR 1). HC1 added with
       `hours:closed` (PR 3), `needs sandbox`; RS1 added for the recording
       storage (below), `needs sandbox`; D1 added with the work order (PR 5),
-      `needs sandbox`; CB1 added with the callbacks (PR 6), `needs sandbox`.
+      `needs sandbox`; CB1 added with the callbacks (PR 6), `needs sandbox`;
+      DP1, P1 and E1 added with the prompt and the split (PR 7), each
+      `needs sandbox` (E1 is settled in the Terraform-first repository's
+      `VERIFY.md` as `harness-checked` by its mirror of PR 7).
 - [ ] Recording storage (tier decision 5), checked 2026-10-05 at 17:25 UTC:
       `list-instance-storage-configs` for CALL_RECORDINGS returned `[]` on
       dev, qa and prod (all us-east-1), so `envs/bootstrap/recordings.tf`
@@ -380,7 +396,15 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       none will until a call reaches an agent (no claimed number, no agent
       user in this tier), and the 30-day expiry caps the exposure.
 - [ ] 1, 2, 6: held by `npm run check` and the emit tests at each PR; the
-      Terraform-first side of 1 waits on the mirror.
+      Terraform-first side of 1 waits on the mirror. PR 7 adds
+      `hashicorp/awscc` (`~> 1.104`, `region` only) to the three flow roots'
+      `providers.tf` and lock files (`npm run lock:providers`), the prompt
+      bucket, object and `awscc_connect_prompt` to `supporting.tf`, the
+      deploy-role rows and the Polly command to `envs/README.md`, and the
+      plugin-directory cache to CI's validate job (`actions/cache`, pinned
+      to a commit SHA, keyed on the lock files). The first flow to use
+      `prompt:salt-line-tips` lands in the same PR as the resource and the
+      provider in every root, never split.
 - [ ] 7, 10: not started.
 
 ## VERIFY rows this tier adds
@@ -546,3 +570,11 @@ awscc_connect_prompt.salt_line_tips.prompt_arn`) and `hh-district-menu.tf`.
   compares the reference through the key. The address maps are unchanged:
   an in-set key has no entry. Worth raising in flow-as-code: the builder and
   codegen cannot express the unaliased form the emitter binds.
+- **The prompt bucket is `hh-<environment>-prompts-<account id>`, not
+  `hh-<environment>-prompts`** (PR 7, 2026-10-05). S3 bucket names are
+  global across every AWS account, so the plain name could already be taken
+  and an apply would fail on it; the account id, read at plan time from
+  `data.aws_caller_identity.current` and never committed, keeps it unique
+  the way the bootstrap root's random suffix does for its buckets. The
+  recordings buckets keep their suffix; this root has no `random_id` and
+  the account id is already in the plan.
