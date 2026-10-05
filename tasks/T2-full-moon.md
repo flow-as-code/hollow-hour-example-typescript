@@ -281,10 +281,19 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
    be recorded.
 10. README: "Scene 2: the Queue of the Dead", and the tier table updated.
 
-## Where the criteria stand (2026-10-04)
+## Where the criteria stand (2026-10-05)
 
-- [ ] 1 to 10: not started. The plan merged on its own PR; no flow, test or
-      resource for this tier exists yet.
+- [ ] 4, in part: the generic-block policy test (PR 1, `tests/flows.test.ts`,
+      "generic blocks"): every companion in `flows/` and `seasonal/` writes
+      no `GenericBlock` for a type the catalog models, with the mutation case
+      a GetParticipantInput carrying `StoreInput "True"`, which 0.2.1's
+      codegen can only write generically.
+- [ ] 8, in part: S1 (`scenarios/s1-safety-path.scenario.json`), checked
+      offline by `tests/envScenarios.test.ts`; not yet run live.
+- [ ] 9, in part: `tests/verify.test.ts` accepts `docs-checked YYYY-MM-DD`
+      and `harness-checked YYYY-MM-DD: <result>` beside the two earlier
+      shapes, each with positive and negative cases (PR 1). No row added yet.
+- [ ] 1 to 3, 5 to 7, 10: not started.
 
 ## VERIFY rows this tier adds
 

@@ -7,8 +7,17 @@
 // manifest and the districts.
 
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { collectRefs, lint, refKey, type FlowAction, type FlowDoc } from "@flow-as-code/core";
+import {
+  codegen,
+  collectRefs,
+  lint,
+  modeledTypes,
+  refKey,
+  type FlowAction,
+  type FlowDoc,
+} from "@flow-as-code/core";
 import { describe, expect, it } from "vitest";
 import { loadDistricts, ROOT } from "../generators/config.js";
 import { loadAll, loadSet, spokenTexts } from "../generators/flowset.js";
@@ -68,6 +77,37 @@ describe("lint", () => {
         findings: [],
         summary: { errors: 0, total: 0, warnings: 0 },
       });
+    },
+  );
+});
+
+// A modeled action written as a GenericBlock in a companion is a shape the
+// typed builder cannot express (0.2.0's Compare without NextAction, VERIFY C1;
+// 0.2.1's GetParticipantInput with StoreInput "True", the gate on task T2's
+// hh-collect-address). It deploys, but the studio and codegen lose the typed
+// view of it, and the showcase exists to show the typed path. The coverage
+// test's ALLOWED_GENERIC governs unmodeled types only and would pass such a
+// block, so this holds it: every GenericBlock in flows/ and seasonal/ is of a
+// type the catalog does not model.
+describe("generic blocks", () => {
+  const modeled = modeledTypes();
+  const genericTypes = (companion: string) =>
+    [...companion.matchAll(/new GenericBlock\(\{[\s\S]*?\btype: "([A-Za-z]+)"/g)].map(
+      (m) => m[1] ?? "",
+    );
+
+  it("catches a modeled type codegen can only write generically, so the policy means something", () => {
+    const main = structuredClone(doc("hh-hotline-main"));
+    action(main, "ask-can-see").Parameters.StoreInput = "True";
+    expect(genericTypes(codegen(main))).toEqual(["GetParticipantInput"]);
+    expect(genericTypes(codegen(doc("hh-hotline-main")))).toEqual([]);
+  });
+
+  it.each(loadAll().map((l) => [l.companionPath, l] as const))(
+    "%s writes no GenericBlock for a type the catalog models",
+    (_path, l) => {
+      const companion = readFileSync(join(ROOT, l.companionPath), "utf8");
+      expect(genericTypes(companion).filter((t) => modeled.includes(t))).toEqual([]);
     },
   );
 });

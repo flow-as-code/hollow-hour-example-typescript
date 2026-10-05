@@ -7,12 +7,18 @@ AWS doc link or its status.
 
 Status is one of:
 
-- **docs-checked 2026-09-30**: the AWS documentation says it, quoted or
+- **docs-checked YYYY-MM-DD**: the AWS documentation says it, quoted or
   paraphrased closely, and where the row names flow-as-code behavior, the
-  published 0.2.0 packages or the flow-as-code repository confirm it.
+  published packages or the flow-as-code repository confirm it. The date is
+  the UTC date the documentation was read; the first rows carry 2026-09-30.
 - **needs sandbox**: the documentation is silent, ambiguous, or has never been
   shown to hold against the service. The design does not depend on the
   answer until a live create or run records one.
+- **harness-checked YYYY-MM-DD: \<result\>**: a row an offline run settles,
+  with no instance involved (the Terraform-first repository's equivalence
+  check, for example, row E1 of task T2). The date is the UTC date of the
+  run and the result is what it showed. A row a create or a live run must
+  answer never takes this status.
 
 When a sandbox check runs, the status becomes
 `sandbox-checked YYYY-MM-DD, <region>: <result>` in the same row, where the
