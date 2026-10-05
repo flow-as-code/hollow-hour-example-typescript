@@ -7,12 +7,15 @@ of the 35 action types flow-as-code 0.2.1 models, adds the CUSTOMER_HOLD and
 AGENT_HOLD flow types and the `prompt` reference type, and lands in all three
 environments in both repositories.
 
-Planned 2026-10-04. Nothing below is built yet; the plan is the design in
-the 2026-10-04 research (Tier 2 placement, resources, ordering), checked
-against the code at `db7f02a`, and amended 2026-10-05 on review (the
-callback carve-out, the closed hours, the key-use test, awscc's provider
-block, the hold flows and hooks, the module alias, the VERIFY status shape,
-the generic-block policy, the C11 gate).
+Planned 2026-10-04. The plan is the design in the 2026-10-04 research (Tier
+2 placement, resources, ordering), checked against the code at `db7f02a`,
+and amended 2026-10-05 on review (the callback carve-out, the closed hours,
+the key-use test, awscc's provider block, the hold flows and hooks, the
+module alias, the VERIFY status shape, the generic-block policy, the C11
+gate). Built 2026-10-05: PRs 1 to 7 are merged (`main` at `b8e5b3f`), PR 8
+stays out until the flow-as-code release that carries C04, and the live
+close has not run. "Record" below says where each criterion stands and
+"Close checklist" what the live session does, in order.
 
 ## Scope
 
@@ -407,7 +410,188 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       to a commit SHA, keyed on the lock files). The first flow to use
       `prompt:salt-line-tips` lands in the same PR as the resource and the
       provider in every root, never split.
-- [ ] 7, 10: not started.
+- [ ] 7: not started; the Close checklist below.
+- [ ] 10, in part: "Scene 2: the Queue of the Dead" with the prank-screen
+      and callback beats landed with the close preparation (branch
+      `t2/close-prep`), and the tier table row reads "built; live apply
+      pending (2026-10-05)". The row flips to live at the close.
+
+## Record (2026-10-05, before the close)
+
+Every criterion, with the evidence so far. PR numbers are this repository's
+(`#4` to `#11`), each with its merge commit on `main`; test names are from
+`tests/`; plan figures are the read-only `tofu -chdir=envs/dev plan
+-lock=false` each PR body recorded after `npm run emit:dev`, cumulative
+because nothing was applied between them, and no plan was taken of qa or
+prod. The PRs and their merges:
+
+| PR  | Number | Merge     | What                                                           |
+| --- | ------ | --------- | -------------------------------------------------------------- |
+| 1   | #4     | `376fb3d` | S1, the `STATUS` widening, the generic-block policy            |
+| 2   | #5     | `d6d1c0c` | the hold flows and their hooks                                 |
+| 3   | #6     | `44b0b49` | the Queue of the Dead, `hours:closed`, HC1, RS1, S5            |
+| 4   | #8     | `ce9d6f3` | the prank screen, S3                                           |
+| 5   | #9     | `5fba17e` | the work order, D1                                             |
+| 6   | #10    | `cfa39d5` | callbacks, S4 and its sweep, CB1                               |
+| 7   | #11    | `b8e5b3f` | awscc, the prompt, the hold A/B split, DP1, P1, E1             |
+| 8   |        |           | not opened: `hh-collect-address` waits on the release with C04 |
+
+1. **Lint**: `npm run lint:flows` reported no findings at every PR (it is
+   part of `npm run check`, green on each: 349, 386, 452, 480, 487, 534 and
+   555 tests passing at PRs 1 to 7). The Terraform-first half is open: the
+   mirror of PRs 1 to 4 merged there as hollow-hour-example-terraform#4
+   (`7fe7b07`, snapshot at `ce9d6f3`) with its `tofu test` and equivalence
+   check green; the mirror of PRs 5 to 7 is in progress, and the criterion
+   needs its snapshot re-vendored from `b8e5b3f` or the close's merge.
+2. **Byte-stable**: `tests/roundtrip.test.ts` and `tests/generator.test.ts`
+   ("leaves the committed tree clean", "is deterministic", "adds exactly two
+   flows for a new district, and changes only the generated menu") green at
+   every PR, and `npm run generate:check` in `npm run check`. The menu
+   Compare branch per district is PR 8's.
+3. **The per-tier floor**: `TIER_FLOOR` in `tests/coverage.test.ts`, "meets
+   the tier 2 floor", names all seven action types, CUSTOMER_HOLD, AGENT_HOLD
+   and the `prompt` reference type, with "catches a dropped flow type or
+   action type, so the floors mean something" as the mutation case;
+   `ALLOWED_GENERIC` is empty. Complete.
+4. **Structural tests**, each with a mutation case, all in
+   `tests/flows.test.ts`: "generic blocks" (PR 1); "hold flows", "the
+   whisper and hold hooks travel together", "no Wait", "uses tier 1 and 2
+   keys only, and every such key, except the dated UNUSED_UNTIL list" (PR 2);
+   "hh-dead-line", "hooked flows never point back", "the callback number",
+   "the plane check in hh-hotline-main" (never skips the safety question),
+   "the district name follows the contact" over the dead line (PR 3); "the
+   prank screen in hh-hotline-main" (no path from the yes reaches
+   `prank-score`; the tag walk with the held `untag-screen` exception)
+   (PR 4); "the work order in hh-hotline-main" (PR 5); "callbacks" (every
+   create names `queue:dispatch-overflow`, none reachable from `lines-busy`,
+   the module's shape, the queue flow's path ending in
+   DisconnectParticipant), the callback-number check over the module and
+   queue flows, the walk over the offer paths (PR 6); "the hold A/B split in
+   the queue flows" (the 1 to 100 shape) (PR 7). `UNUSED_UNTIL` holds the two
+   PR 8 entries. The drift item (`CONNECT_TYPES` mapping `agent` to `queue`)
+   landed with the close preparation, `tests/drift.test.ts` "reads an agent
+   ARN as a queue" and "finds no drift between a queue token and the agent
+   ARN it binds to", both shown failing on the unmapped script. Complete.
+5. **Copy**: `tests/copy.test.ts` scans every new document, the Lambdas'
+   spoken strings and `prompts/salt-line-tips.txt` for the banned terms, the
+   phone range and the emergency line; "ends the prank path kindly" (PR 4);
+   the wav header (PR 7). Complete.
+6. **Environment invariants**: `tests/envEmit.test.ts` ("qa and prod emit
+   byte-identical trees", "dev and prod differ only in ... hours:<district>
+   lines", "prod and prod-october differ only in hours:<district> and
+   module:greeting@live") green at every PR, and each PR body records
+   `diff -r build/emit/qa build/emit/prod` empty. `hours:closed` and
+   `prompt:salt-line-tips` bind identically in every profile
+   (`tests/envSupporting.test.ts`). Complete.
+7. **Live**: not started. The cumulative read-only dev plan stands at
+   **16 to add, 10 to change, 0 to destroy** after PR 7 (PR 2: 2 to add, 5
+   to change; PR 3: 7 and 5; PR 4: 7 and 7; PR 5: 7 and 10; PR 6: 10 and
+   10). The adds: `aws_connect_hours_of_operation.closed`, the six dead-line
+   and hold flows, the callback module with its version and alias, the
+   prompt bucket with its three settings, the object and
+   `awscc_connect_prompt.salt_line_tips`. The changes: the hotline, the
+   generated menu, the three district flows, the three queue flows and the
+   two stub Lambdas whose comments changed (PR 4). The bootstrap root was
+   validated at PR 3, never planned; its apply adds 18 resources. qa and
+   prod were never planned with Tier 2 in them.
+8. **Scenarios**: S1 (PR 1), S5 (PR 3), S3 (PR 4) and S4 with its sweep
+   (PR 6) are checked offline by `tests/envScenarios.test.ts` ("holds S1 to
+   S5", and per file: valid for the pinned CLI, every token resolvable, only
+   prompts the flows say, the stubs' answers, keys the prompt takes). None
+   has run live. The not-simulatable list is the table in
+   `scenarios/README.md`, "What can be simulated".
+9. **VERIFY rows**: HC1 and RS1 (PR 3), D1 (PR 5), CB1 (PR 6), DP1, P1 and
+   E1 (PR 7) are in `VERIFY.md`, each `needs sandbox` with its AWS
+   documentation and a sentence naming what decides it;
+   `tests/verify.test.ts` requires each id since the close preparation. The
+   status shapes `docs-checked YYYY-MM-DD` and `harness-checked YYYY-MM-DD:
+<result>` landed in PR 1 with their positive and negative cases. Open
+   until the close records results.
+10. **README**: "Scene 2: the Queue of the Dead", with the prank screen and
+    callbacks as beats under it, landed with the close preparation; the
+    tier table row reads "built; live apply pending (2026-10-05)" and flips
+    at the close.
+
+## Close checklist
+
+What the live session does, in this order, with nothing applied before the
+step that applies it. One environment at a time, by hand or through
+`deploy.yml` (either is recorded), with `AWS_PROFILE=flow-as-code`, Region
+`us-east-1`, the saved-plan form (`plan -out`, then `apply <file>`, never
+`-auto-approve`), and `date -u` at every step. Do not run S4 on a Sunday
+between 03:00 and 03:01 America/New_York.
+
+1. **Start**: `main` at the merge of the close preparation; `npm ci`;
+   `npm run check` green; `.live/instances.json` present for dev, qa and
+   prod. `npm view @flow-as-code/cli version` is read, not assumed; the pins
+   stay 0.2.1.
+2. **Bootstrap apply** (RS1): `tofu -chdir=envs/bootstrap init` with the
+   backend config, `plan -out=bootstrap.tfplan`: expect **18 to add, 0 to
+   change, 0 to destroy**, all under `recordings.tf` (per environment: the
+   bucket, its encryption, public-access block, ownership controls and
+   lifecycle rule, and the CALL_RECORDINGS storage config), and nothing on
+   the instances or the state bucket; otherwise stop and read why. Apply
+   the saved plan. Then, per instance,
+   `aws connect list-instance-storage-configs --resource-type CALL_RECORDINGS`
+   shows the config, and `aws iam list-role-policies` on the instance's
+   service-linked role records whether the service added a policy. The
+   prompt buckets are not here: they are in each flow root's
+   `supporting.tf` and come with step 4.
+3. **Seasonal roots unchanged**: `tofu -chdir=envs/seasonal-<env> plan` for
+   dev, qa and prod: expect "No changes" on each (Tier 2 touches nothing
+   there, and awscc is not in them). A change means something drifted since
+   T1; stop.
+4. **Flow roots, dev then qa then prod**: `npm run emit:<env>`, `init` with
+   the backend config, `plan -out=flows.tfplan`. On dev expect **16 to add,
+   10 to change, 0 to destroy**, the resources listed under criterion 7;
+   on qa and prod expect the same resources (they were never planned, so
+   read the list rather than the count alone). Apply the saved plan, then a
+   fresh plan shows "No changes". This apply answers three rows on dev:
+   HC1 (`closed` accepted, or the refusal quoted, then
+   `aws connect describe-hours-of-operation` on it), DP1 (the three
+   `hh-queue-experience-*` flows with `pick-hold-variant` accepted in a
+   CUSTOMER_QUEUE flow, or the refusal quoted) and P1 (the prompt created
+   from the private bucket with the deploy credentials, then
+   `aws connect describe-prompt`, or the refusal quoted). A refused create
+   takes the fallback its row names (HC1 the zero-config form through
+   awscc, DP1 the split moved to the district flow, P1 a bucket policy for
+   the principal the refusal names) before moving on to qa.
+5. **Drift**: per environment, `node scenarios/resource-map.mjs <env>`
+   first (a stale map reports false drift, VERIFY R1), then
+   `npm run drift -- <env>`: expect "No drift." on dev, qa and prod, each
+   with its UTC time.
+6. **Scenarios**: `npx flow-cli simulate scenarios/ --instance <ARN>
+--resource-map scenarios/<env>.resources.json` on dev and on prod, for
+   S1, S3, S4 and S5 (S2 as well, the T1 regression, is cheap and
+   recommended); qa waits on its concurrent-calls quota (VERIFY S2), so one
+   run there records whether the quota moved and nothing more. Record per
+   scenario: the UTC start, the exit code and the JUnit counts. S5 records
+   which callback-number branch fired if the execution records show it
+   (VERIFY 6.2).
+7. **The S4 sweep** after every S4 run, on that instance:
+   `search-contacts` for CALLBACK contacts in `hh-<env>-dispatch-overflow`
+   since the run began, `describe-contact` and `get-contact-attributes` on
+   each, `stop-contact` on each, the search again expecting no ids
+   (`scenarios/README.md`, "After an S4 run"). What it found is CB1's
+   result.
+8. **VERIFY rows to settle**, each as `sandbox-checked YYYY-MM-DD,
+us-east-1: <result>` in the same change: **D1** (from an S3 or S4
+   contact on dev, which reaches `open-work-order`: `aws connect
+describe-contact` on its id shows what Description holds, and a contact
+   search by the name "Hollow Hour work order" whether it is findable),
+   **CB1** (step 7), **DP1**, **P1** and **HC1** (step 4, plus S4's
+   after-hours prompt for HC1), **RS1** (step 2), and **E1** as
+   `harness-checked <date>: <result>` copied from the Terraform-first
+   repository's `VERIFY.md` once its mirror of PR 7 records one; if it has
+   not by the close, E1 stays `needs sandbox` and the close says so.
+9. **The README table flip**: the T2 row to "live in dev, qa and prod
+   (<date>)" with the scenario results, the status blockquote at the top,
+   criteria 7 to 10 above checked with their dates, this Record brought up
+   to date, and the line in `tasks/README.md`.
+10. **Terraform-first**: not this repository's close, but criterion 1's
+    second half: the snapshot re-vendored from the close's merge commit
+    with `tofu test` and the equivalence check green there, and its own
+    applies in us-west-2 recorded in its `tasks/README.md`.
 
 ## VERIFY rows this tier adds
 
@@ -570,8 +754,11 @@ awscc_connect_prompt.salt_line_tips.prompt_arn`) and `hh-district-menu.tf`.
   hand), and `scenarios/resource-map.mjs` maps `module:<name>` and
   `module:<name>@<alias>` from the flow root's state so `npm run drift`
   compares the reference through the key. The address maps are unchanged:
-  an in-set key has no entry. Worth raising in flow-as-code: the builder and
-  codegen cannot express the unaliased form the emitter binds.
+  an in-set key has no entry. Raised in flow-as-code as
+  [flow-as-code#41](https://github.com/flow-as-code/flow-as-code/issues/41)
+  (open): the builder and codegen cannot express the unaliased form the
+  emitter binds. Until it is settled there, the module is released through
+  its `live` alias here, and the Terraform-first mirror binds the same key.
 - **The prompt bucket is `hh-<environment>-prompts-<account id>`, not
   `hh-<environment>-prompts`** (PR 7, 2026-10-05). S3 bucket names are
   global across every AWS account, so the plain name could already be taken
@@ -580,3 +767,18 @@ awscc_connect_prompt.salt_line_tips.prompt_arn`) and `hh-district-menu.tf`.
   the way the bootstrap root's random suffix does for its buckets. The
   recordings buckets keep their suffix; this root has no `random_id` and
   the account id is already in the plan.
+- **PR 7 merged before the mirror answered E1** (2026-10-05). The plan had
+  "P1, DP1, and E1 answered in the mirror before it merges" and each PR
+  followed by its mirror and a snapshot bump. PRs 1 to 4 were mirrored
+  together (hollow-hour-example-terraform#4, `7fe7b07`, snapshot at
+  `ce9d6f3`); the mirror of PRs 5 to 7 was still in progress when PR 7
+  merged here (`b8e5b3f`). So E1 is `needs sandbox` in this repository with
+  the mirror's harness named as what decides it, and criterion 1's
+  Terraform-first half is open until that mirror lands and the snapshot is
+  re-vendored from a merge at or after `b8e5b3f`. P1 and DP1 are not
+  affected: a create on dev answers them, which is this repository's close.
+- **The drift fix landed with the close preparation, not with a flow PR**
+  (2026-10-05). The Scope entry put `CONNECT_TYPES` mapping `agent` to
+  `queue` in this tier without naming a PR; it has no flow and no resource,
+  so it rode with the close preparation (branch `t2/close-prep`), with its
+  test shown failing first.

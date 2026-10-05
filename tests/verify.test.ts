@@ -61,6 +61,11 @@ describe("VERIFY.md", () => {
       "15",
       "HC1",
       "RS1",
+      "D1",
+      "CB1",
+      "DP1",
+      "P1",
+      "E1",
     ]) {
       expect(ids).toContain(id);
     }

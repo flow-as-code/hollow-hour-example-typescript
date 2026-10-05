@@ -61,14 +61,20 @@ const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const ARN = new RegExp(["arn", "aws[\\w-]*"].join(":") + ":[\\w-]+:[\\w-]*:\\d*:[^\\s\"'}]+", "g");
 const TOKEN = /\$\{cdref:([a-z]+):([^}]+)\}/g;
 
-/** Connect ARN resource segments, by the reference type the flows use. */
+/**
+ * Connect ARN resource segments, by the reference type the flows use. An
+ * agent queue has no resource of its own: the flows type it as `queue:` and
+ * bind it to the Connect user's ARN (VERIFY.md, row 16.11), so an `agent`
+ * segment reads as `queue`, or every flow naming an agent queue would be
+ * reported as changed when nothing is.
+ */
 const CONNECT_TYPES = /** @type {Record<string, string>} */ ({
   queue: "queue",
   "operating-hours": "hours",
   "contact-flow": "flow",
   "flow-module": "module",
   prompt: "prompt",
-  agent: "agent",
+  agent: "queue",
 });
 
 /**

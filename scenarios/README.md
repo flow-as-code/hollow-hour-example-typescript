@@ -14,9 +14,23 @@ every expected prompt and keypad press one the flows really make.
 | `s4-after-hours-callback.scenario.json`     | 2    | Mrs. Alder's S2 path with Old Town's hours substituted with `hours:closed`: the after-hours message, the callback offer, press 1; then the sweep below |
 | `s5-departed-caller.scenario.json`          | 2    | A caller from 555-0193: plane-check says beyond, hh-dead-line welcomes them and queues them for the dead                                               |
 
-S6 (metrics), S8 (campaigns) and S9 (chat view) cannot be simulated
-(VERIFY.md, row 15), and neither are the hold flows (they need an agent
-placing a voice hold) or which A/B branch a run takes.
+## What can be simulated
+
+Every scenario above runs under the harness; what each one cannot observe
+is listed with it, and what no scenario can reach is documented rather than
+faked.
+
+| What                                         | Simulated | Where the run stops, and what it cannot see                                                                                                                                                  |
+| -------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S1, the safety path                          | yes       | at the goodbye prompt; the disconnect after it is not an event the pinned flow-cli observes                                                                                                  |
+| S2, the keypad interview                     | yes       | at the transfer to the Old Town crew queue, with Old Town's hours substituted                                                                                                                |
+| S3, Theo's dare                              | yes       | after the advice; the tag and untag are not events the harness observes, so the asserts (grade, gradeName) show `classify` ran after the 1                                                   |
+| S4, the after-hours callback                 | yes       | at the keypress that takes the offer; the module invoke and CreateCallbackContact are not observed, so whether a callback was created is read afterwards by the sweep below (VERIFY.md, CB1) |
+| S5, a departed caller                        | yes       | at the transfer to `queue:the-dead`; which callback-number error branch fired, if either, is not observed (VERIFY.md, 6.2), and both rejoin                                                  |
+| the hold flows (`hh-*-hold`)                 | no        | a hold flow runs when an agent places a voice hold, and every test ends before an agent; the evidence is the create on apply and `tests/flows.test.ts`                                       |
+| which side of the hold A/B split a run takes | no        | DistributeByPercentage is not a substitutable action (VERIFY.md, row 15); the side taken is read after the fact from the `holdVariant` tag in contact search (VERIFY.md, DP1)                |
+| S6, queue metrics                            | no        | `$.Metrics.*` cannot be overridden (VERIFY.md, row 15); the overflow is heard live by filling a capped dev queue                                                                             |
+| S8, outbound campaigns; S9, the chat view    | no        | not overridable (VERIFY.md, row 15); Tier 3                                                                                                                                                  |
 
 ## Running one
 
@@ -64,6 +78,21 @@ StopContact is documented for exactly this ("Use this API to stop queued
 callbacks"). Run the search again afterwards and expect no ids. Never run
 S4 on Sunday between 03:00 and 03:01 America/New_York, the one minute
 `hours:closed` is open (VERIFY.md, HC1).
+
+The sweep is also CB1's evidence, so before stopping each id, describe it:
+
+```sh
+aws connect describe-contact --instance-id "$INSTANCE_ID" --region "$REGION" \
+  --contact-id <each id> --query 'Contact.{Method:InitiationMethod,Queue:QueueInfo.Id}'
+aws connect get-contact-attributes --instance-id "$INSTANCE_ID" --region "$REGION" \
+  --initial-contact-id <each id>
+```
+
+Record in VERIFY.md, row CB1, with the run's UTC time: whether the search
+found a callback at all (none means EndTest at the keypress kept the create
+from running, or the create ran and failed), and if it did, whether its
+attributes carry `district` and `districtName`, which Tier 3's outbound
+whisper reads.
 
 ## Writing a prompt expectation
 
