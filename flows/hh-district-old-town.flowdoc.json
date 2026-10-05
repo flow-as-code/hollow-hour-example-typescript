@@ -415,19 +415,19 @@
           "Text": "We can call you back instead. For a callback, press 1. To end the call, press 2."
         },
         "Transitions": {
-          "NextAction": "hang-up",
+          "NextAction": "sign-off",
           "Errors": [
             {
               "ErrorType": "InputTimeLimitExceeded",
-              "NextAction": "hang-up"
+              "NextAction": "sign-off"
             },
             {
               "ErrorType": "NoMatchingCondition",
-              "NextAction": "hang-up"
+              "NextAction": "sign-off"
             },
             {
               "ErrorType": "NoMatchingError",
-              "NextAction": "hang-up"
+              "NextAction": "sign-off"
             }
           ],
           "Conditions": [
@@ -441,7 +441,7 @@
               }
             },
             {
-              "NextAction": "hang-up",
+              "NextAction": "sign-off",
               "Condition": {
                 "Operator": "Equals",
                 "Operands": [
@@ -464,6 +464,23 @@
             {
               "ErrorType": "NoMatchingError",
               "NextAction": "apologize"
+            }
+          ],
+          "Conditions": []
+        }
+      },
+      {
+        "Identifier": "sign-off",
+        "Type": "MessageParticipant",
+        "Parameters": {
+          "Text": "All right. Keep the lights on, and call us again any time."
+        },
+        "Transitions": {
+          "NextAction": "hang-up",
+          "Errors": [
+            {
+              "ErrorType": "NoMatchingError",
+              "NextAction": "hang-up"
             }
           ],
           "Conditions": []
@@ -777,9 +794,13 @@
       "x": 1320,
       "y": 20
     },
-    "take-callback": {
+    "sign-off": {
       "x": 4960,
       "y": 20
+    },
+    "take-callback": {
+      "x": 4960,
+      "y": 120
     },
     "transfer-to-crew": {
       "x": 2880,
@@ -854,7 +875,7 @@
   ],
   "meta": {
     "generator": "hollow-hour-example generators/districts.ts",
-    "sourceHash": "sha256:dd0f3eb38612eefa1d1c9c25dfef93f61c60c4a220e8b0340b3d23d56a2e8469",
+    "sourceHash": "sha256:e61ed6e494040ae9b085650d0a190621e5247d21b2aee22e5bb0ae0c22d719cc",
     "sourceKind": "ts"
   }
 }

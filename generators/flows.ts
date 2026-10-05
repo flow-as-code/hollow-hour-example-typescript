@@ -42,10 +42,13 @@
 //   module's version and live alias into the same flows.tf, applied with the
 //   flows that invoke it. It never offers one at lines-busy, which is
 //   reached exactly when dispatch-overflow is full, where the create would
-//   take its error branch. The queue flow cannot invoke a module, so it
-//   inlines the same two blocks when crew-eta says the wait is long, and
-//   ends that path with DisconnectParticipant, never EndFlowExecution, so no
-//   caller is both queued and holding a callback.
+//   take its error branch. A caller who declines the offer, says nothing or
+//   presses a wrong key hears sign-off before the hang-up, never a silent
+//   disconnect. The module's copy is shift-neutral, because it is invoked
+//   mid-shift at overflow-full as well as after hours. The queue flow cannot
+//   invoke a module, so it inlines the same two blocks when crew-eta says the
+//   wait is long, and ends that path with DisconnectParticipant, never
+//   EndFlowExecution, so no caller is both queued and holding a callback.
 
 import {
   CheckHoursOfOperation,
@@ -248,17 +251,23 @@ export function districtFlow(d: District, districts: readonly District[]): Flow 
       timeoutSeconds: 8,
       branches: [
         { digit: "1", target: "take-callback" },
-        { digit: "2", target: "hang-up" },
+        { digit: "2", target: "sign-off" },
       ],
-      onTimeout: "hang-up",
-      onNoMatch: "hang-up",
-      onError: "hang-up",
+      onTimeout: "sign-off",
+      onNoMatch: "sign-off",
+      onError: "sign-off",
     }),
     new InvokeFlowModule({
       id: "take-callback",
       module: Refs.module("hh-offer-callback", "live"),
       next: "hang-up",
       onError: "apologize",
+    }),
+    new MessageParticipant({
+      id: "sign-off",
+      text: "All right. Keep the lights on, and call us again any time.",
+      next: "hang-up",
+      onError: "hang-up",
     }),
     ...dispatchBlocks(),
   );

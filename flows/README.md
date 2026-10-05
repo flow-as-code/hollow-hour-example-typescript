@@ -90,9 +90,12 @@ holds that for every flow. `hh-district-<slug>` offers one in two places,
 after hours and at `overflow-full` (the sibling crew is full as well;
 dispatch-overflow is not known to be), through `module:hh-offer-callback@live`:
 the caller's own number (`$.CustomerEndpoint.Address`, both errors wired),
-then the create, then "A crew will call when the night shift starts, or
-sooner if one comes free"; a refused create has its own copy and ends the
-module. The offer is never made at `lines-busy`, the QueueAtCapacity branch
+then the create, then "A crew will call you back as soon as one comes
+free"; a refused create has its own copy and ends the module. The module's
+copy is shift-neutral, because `overflow-full` invokes it mid-shift. A
+caller who presses 2, presses nothing or presses a wrong key at the offer
+hears `sign-off` ("All right. Keep the lights on, and call us again any
+time.") before the hang-up, never a silent disconnect. The offer is never made at `lines-busy`, the QueueAtCapacity branch
 of the dispatch transfer, because that branch is reached exactly when
 dispatch-overflow is full and a callback into a full queue takes the error
 branch. A customer queue flow cannot invoke a module, so

@@ -1068,7 +1068,6 @@ function callbackProblems(d: FlowDoc, crews: ReadonlySet<string>): string[] {
 
 describe("callbacks", () => {
   const crews = new Set(districts.map((d) => `\${cdref:queue:${d.slug}-crew}`));
-  const module = doc("hh-offer-callback");
   const first = districts[0];
   if (first === undefined) throw new Error("no districts");
   const district = doc(`hh-district-${first.slug}`);
@@ -1118,6 +1117,9 @@ describe("callbacks", () => {
   });
 
   it("hh-offer-callback: number, create, and a copy of its own for a refused create, every path ending the module", () => {
+    // Resolved here, not at describe time, so a missing module fails this
+    // test by name instead of crashing the file's collection.
+    const module = doc("hh-offer-callback");
     expect(module.connectType).toBe("MODULE");
     expect(module.content.StartAction).toBe("set-callback-number");
     expect(action(module, "set-callback-number").Transitions.NextAction).toBe("create-callback");
@@ -1129,9 +1131,11 @@ describe("callbacks", () => {
     expect(action(module, "callback-refused").Parameters.Text).toContain(
       "We cannot take a callback right now",
     );
+    // Shift-neutral: the module is invoked at overflow-full as well as after hours.
     expect(action(module, "callback-taken").Parameters.Text).toContain(
-      "A crew will call when the night shift starts",
+      "A crew will call you back as soon as one comes free",
     );
+    expect(action(module, "cannot-ring-back").Parameters.Text).not.toMatch(/night shift/);
     for (const e of action(module, "set-callback-number").Transitions.Errors ?? []) {
       expect(e.NextAction).toBe("cannot-ring-back");
     }
@@ -1144,7 +1148,7 @@ describe("callbacks", () => {
   for (const d of districts) {
     const flow = doc(`hh-district-${d.slug}`);
 
-    it(`${d.slug}: offers the callback after hours and at overflow-full, through the module, and keeps lines-busy plain`, () => {
+    it(`${d.slug}: offers the callback after hours and at overflow-full, through the module, signs off a caller who declines, and keeps lines-busy plain`, () => {
       expect(
         (action(flow, "transfer-to-overflow").Transitions.Errors ?? []).find(
           (e) => e.ErrorType === "QueueAtCapacity",
@@ -1157,10 +1161,20 @@ describe("callbacks", () => {
         (offer.Transitions.Conditions ?? []).map((c) => [c.Condition.Operands[0], c.NextAction]),
       ).toEqual([
         ["1", "take-callback"],
-        ["2", "hang-up"],
+        ["2", "sign-off"],
       ]);
-      expect(offer.Transitions.NextAction).toBe("hang-up");
-      for (const e of offer.Transitions.Errors ?? []) expect(e.NextAction).toBe("hang-up");
+      // A decline, a timeout, a wrong key and an input error all hear the
+      // sign-off before the hang-up; nothing disconnects in silence.
+      expect(offer.Transitions.NextAction).toBe("sign-off");
+      expect((offer.Transitions.Errors ?? []).map((e) => e.ErrorType).sort()).toEqual([
+        "InputTimeLimitExceeded",
+        "NoMatchingCondition",
+        "NoMatchingError",
+      ]);
+      for (const e of offer.Transitions.Errors ?? []) expect(e.NextAction).toBe("sign-off");
+      const signOff = action(flow, "sign-off");
+      expect(signOff.Type).toBe("MessageParticipant");
+      expect(signOff.Transitions.NextAction).toBe("hang-up");
       const take = action(flow, "take-callback");
       expect(take.Type).toBe("InvokeFlowModule");
       expect(take.Parameters.FlowModuleId).toBe("${cdref:module:hh-offer-callback@live}");

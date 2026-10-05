@@ -2,7 +2,7 @@
   "flowdoc": "0.2",
   "kind": "module",
   "name": "hh-offer-callback",
-  "description": "Takes a callback for a caller who cannot wait: the caller's own number, then a callback contact in the dispatch-overflow queue, which a crew works when the night shift starts. Invoked by hh-district-<slug> after hours and when both crews are full.",
+  "description": "Takes a callback for a caller who cannot wait: the caller's own number, then a callback contact in the dispatch-overflow queue, worked by the next crew that comes free. Invoked by hh-district-<slug> after hours and when both crews are full.",
   "connectType": "MODULE",
   "content": {
     "Version": "2019-10-30",
@@ -58,7 +58,7 @@
         "Identifier": "callback-taken",
         "Type": "MessageParticipant",
         "Parameters": {
-          "Text": "You are on the list. A crew will call when the night shift starts, or sooner if one comes free. Keep the lights on until then."
+          "Text": "You are on the list. A crew will call you back as soon as one comes free. Keep the lights on until then."
         },
         "Transitions": {
           "NextAction": "done",
@@ -92,7 +92,7 @@
         "Identifier": "cannot-ring-back",
         "Type": "MessageParticipant",
         "Parameters": {
-          "Text": "We cannot ring you back at the number you are calling from, so please call us again when the night shift starts."
+          "Text": "We cannot ring you back at the number you are calling from, so please call us again from another phone."
         },
         "Transitions": {
           "NextAction": "done",
@@ -148,7 +148,7 @@
   ],
   "meta": {
     "generator": "cli@0.2.1",
-    "sourceHash": "sha256:4f50e810d71a80e2df7cabe6c0522cccc19a0b972d50136f747e997072253e99",
+    "sourceHash": "sha256:6a8259ae0942b6dc980d1a8dd1a53945612edddf7960c61ed689c2e296dadb60",
     "sourceKind": "ts"
   }
 }

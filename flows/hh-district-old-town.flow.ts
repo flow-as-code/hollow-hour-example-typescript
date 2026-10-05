@@ -161,17 +161,23 @@ export function hhDistrictOldTown(): Flow {
       timeoutSeconds: 8,
       branches: [
         { digit: "1", target: "take-callback" },
-        { digit: "2", target: "hang-up" },
+        { digit: "2", target: "sign-off" },
       ],
-      onTimeout: "hang-up",
-      onNoMatch: "hang-up",
-      onError: "hang-up",
+      onTimeout: "sign-off",
+      onNoMatch: "sign-off",
+      onError: "sign-off",
     }),
     new InvokeFlowModule({
       id: "take-callback",
       module: Refs.module("hh-offer-callback", "live"),
       next: "hang-up",
       onError: "apologize",
+    }),
+    new MessageParticipant({
+      id: "sign-off",
+      text: "All right. Keep the lights on, and call us again any time.",
+      next: "hang-up",
+      onError: "hang-up",
     }),
     new MessageParticipant({
       id: "hand-to-dispatch",

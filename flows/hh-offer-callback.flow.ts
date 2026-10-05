@@ -14,7 +14,7 @@ import {
 export function hhOfferCallback(): FlowModule {
   return new FlowModule({
     name: "hh-offer-callback",
-    description: "Takes a callback for a caller who cannot wait: the caller's own number, then a callback contact in the dispatch-overflow queue, which a crew works when the night shift starts. Invoked by hh-district-<slug> after hours and when both crews are full.",
+    description: "Takes a callback for a caller who cannot wait: the caller's own number, then a callback contact in the dispatch-overflow queue, worked by the next crew that comes free. Invoked by hh-district-<slug> after hours and when both crews are full.",
     settings: { InputParameters: [], OutputParameters: [], Transitions: [] },
   }).add(
     new UpdateContactCallbackNumber({
@@ -35,7 +35,7 @@ export function hhOfferCallback(): FlowModule {
     }),
     new MessageParticipant({
       id: "callback-taken",
-      text: "You are on the list. A crew will call when the night shift starts, or sooner if one comes free. Keep the lights on until then.",
+      text: "You are on the list. A crew will call you back as soon as one comes free. Keep the lights on until then.",
       next: "done",
       onError: "done",
     }),
@@ -47,7 +47,7 @@ export function hhOfferCallback(): FlowModule {
     }),
     new MessageParticipant({
       id: "cannot-ring-back",
-      text: "We cannot ring you back at the number you are calling from, so please call us again when the night shift starts.",
+      text: "We cannot ring you back at the number you are calling from, so please call us again from another phone.",
       next: "done",
       onError: "done",
     }),
