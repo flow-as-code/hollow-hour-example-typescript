@@ -15,8 +15,8 @@ directory is the record of how anything got the way it is.
 
 T2 to T4 were planned on 2026-10-04. T2 is live: its PRs 1 to 7 merged on
 2026-10-05, the close applied dev, qa and prod on 2026-10-06 and ran the
-open scenarios and VERIFY rows on 2026-10-13, and prod's scenarios are
-still to run (its file, "The close"). PR 8, the address module, waits on
+open scenarios and VERIFY rows on 2026-10-13, S1 to S5 passing on dev and
+prod; qa's scenarios wait on its quota (its file, "The close"). PR 8, the address module, waits on
 the flow-as-code release that carries C04. T3
 and T4 are not started. T3 starts after the
 season; only its chat-flow PR waits for the flow-as-code release that

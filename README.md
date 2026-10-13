@@ -17,9 +17,9 @@ environment. For the same hotline written entirely in Terraform, see
 > each flow root took the Tier 2 flows (16 resources added and 10 changed in
 > each), with every FlowDoc matching what is live (`npm run drift`).
 > Scenarios S1, S2, S3 and S5 passed on dev on 2026-10-06 and S4 on
-> 2026-10-13, run alone, leaving no callback behind. Prod's Tier 2 scenarios
-> were not run at the close, and qa's still wait on a quota increase for the
-> instance's concurrent calls (VERIFY.md, S2). Tier 1 went live on
+> 2026-10-13, run alone, and all five passed on prod on 2026-10-13, leaving
+> no callback behind on either. qa's still wait on a quota increase for the
+> instance's concurrent calls, requested on 2026-10-13 (VERIFY.md, S2). Tier 1 went live on
 > 2026-09-30, and all three instances are in us-east-1 (VERIFY.md, R1). See
 > [Tiers and status](#tiers-and-status).
 >
@@ -396,13 +396,13 @@ instance yet.
 
 ## Tiers and status
 
-| Tier | Name          | Scope                                                                                                                                                        | Status                                                                                                                                                                                                                       |
-| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T0   | Scaffold      | Layout, toolchain, CI, environment roots, reference manifest, VERIFY.md                                                                                      | done; owner setup open                                                                                                                                                                                                       |
-| T1   | First night   | Main line with keypad triage and interview, generated district and queue flows, whispers, seasonal greetings, supporting resources in all three environments | live in dev, qa and prod, all in us-east-1 (2026-09-30); qa S2 waits on a quota increase                                                                                                                                     |
-| T2   | Full moon     | Holds, the Queue of the Dead, prank screen, work orders, callbacks, a hold A/B test with a recorded prompt, the address module (when flow-as-code C04 ships) | live in dev, qa and prod, all in us-east-1 (2026-10-06); S1 to S5 passed on dev, prod's scenarios not run at the close, qa's wait on a quota increase; the address module waits on the flow-as-code release that carries C04 |
-| T3   | Witching hour | Bo as an agent, transfers to him and the Lantern Crew, the outbound whisper, the chat field guide, Lex if gated in, the drift-and-adopt scene                | planned 2026-10-04 ([T3](tasks/T3-witching-hour.md)); after the season; its chat flow waits for flow-as-code C11                                                                                                             |
-| T4   | Full coverage | Every documented action type flow-as-code Phase D models, used here or recorded as deploy-only or not coverable with the reason                              | planned 2026-10-04 ([T4](tasks/T4-full-coverage.md)); follows Phase D releases                                                                                                                                               |
+| Tier | Name          | Scope                                                                                                                                                        | Status                                                                                                                                                                                         |
+| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T0   | Scaffold      | Layout, toolchain, CI, environment roots, reference manifest, VERIFY.md                                                                                      | done; owner setup open                                                                                                                                                                         |
+| T1   | First night   | Main line with keypad triage and interview, generated district and queue flows, whispers, seasonal greetings, supporting resources in all three environments | live in dev, qa and prod, all in us-east-1 (2026-09-30); qa S2 waits on a quota increase                                                                                                       |
+| T2   | Full moon     | Holds, the Queue of the Dead, prank screen, work orders, callbacks, a hold A/B test with a recorded prompt, the address module (when flow-as-code C04 ships) | live in dev, qa and prod, all in us-east-1 (2026-10-06); S1 to S5 passed on dev and prod, qa's wait on a quota increase; the address module waits on the flow-as-code release that carries C04 |
+| T3   | Witching hour | Bo as an agent, transfers to him and the Lantern Crew, the outbound whisper, the chat field guide, Lex if gated in, the drift-and-adopt scene                | planned 2026-10-04 ([T3](tasks/T3-witching-hour.md)); after the season; its chat flow waits for flow-as-code C11                                                                               |
+| T4   | Full coverage | Every documented action type flow-as-code Phase D models, used here or recorded as deploy-only or not coverable with the reason                              | planned 2026-10-04 ([T4](tasks/T4-full-coverage.md)); follows Phase D releases                                                                                                                 |
 
 Each tier's acceptance criteria are in [`tasks/`](tasks/).
 
