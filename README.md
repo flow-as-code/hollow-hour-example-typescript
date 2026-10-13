@@ -12,16 +12,15 @@ FlowDocs and TypeScript, and Terraform is generated from them per
 environment. For the same hotline written entirely in Terraform, see
 [hollow-hour-example-terraform](https://github.com/flow-as-code/hollow-hour-example-terraform).
 
-> Status: **Tier 1 live in dev, qa and prod** (task T1, 2026-09-30). The
-> bootstrap root created the three instances and the state bucket, and each
-> environment is applied: 6 resources in each seasonal root and 55 in each
-> flow root, dev and qa earlier that day and prod at about 20:20 UTC, with
-> every FlowDoc matching what is live (`npm run drift`). Scenario S2 passed on
-> dev and on prod; on qa it waits on a quota increase for the instance's
-> concurrent calls (VERIFY.md, S2). All three instances are in us-east-1:
-> dev moved there from us-west-2 later that day, by destroy, instance
-> replacement and re-apply, and afterwards drift was clean on all three and
-> S2 passed on the new dev (VERIFY.md, R1). See
+> Status: **Tier 2 live in dev, qa and prod** (task T2). On 2026-10-06 the
+> bootstrap root added call-recording storage for all three instances, and
+> each flow root took the Tier 2 flows (16 resources added and 10 changed in
+> each), with every FlowDoc matching what is live (`npm run drift`).
+> Scenarios S1, S2, S3 and S5 passed on dev on 2026-10-06 and S4 on
+> 2026-10-13, run alone, leaving no callback behind. Prod's Tier 2 scenarios
+> were not run at the close, and qa's still wait on a quota increase for the
+> instance's concurrent calls (VERIFY.md, S2). Tier 1 went live on
+> 2026-09-30, and all three instances are in us-east-1 (VERIFY.md, R1). See
 > [Tiers and status](#tiers-and-status).
 >
 > The deploy found that Amazon Connect refuses a Compare with no
@@ -149,8 +148,8 @@ Offline, `tests/envScenarios.test.ts` replays S5 and `tests/flows.test.ts`
 holds the shape: the welcome before the recording block, the adjustment
 negative and static and set before the transfer, four hooks one per block,
 both callback-number errors wired, and no path that reaches the dead line
-without the safety question. The live run is an operator step at the tier's
-close (T2 criterion 8).
+without the safety question. S5 passed live on dev on 2026-10-06 (T2
+criterion 8).
 
 ### The prank screen
 
@@ -175,7 +174,8 @@ back any time something goes bump." and the call ends there, kindly. Theo
 pressed 1, so his call is graded like any other and opened as a work order
 (`open-work-order`, UpdateContactData, named "Hollow Hour work order" and
 described by the advice), which is how every graded call, his included, is
-found in contact search.
+found in contact search by that name
+([VERIFY.md, row D1](VERIFY.md#the-table)).
 
 ### Callbacks
 
@@ -205,8 +205,9 @@ tips and half to the one recorded prompt in the set
 split is readable in contact search.
 
 The simulated S4 ends at the keypress: the module and the callback it creates
-are not events the harness observes, so whether a real callback is created
-is an open row ([VERIFY.md, row CB1](VERIFY.md#the-table)), and every S4 run
+are not events the harness observes. The sweep after S4 passed on dev on
+2026-10-13 found no callback created
+([VERIFY.md, row CB1](VERIFY.md#the-table)), and every S4 run
 on an instance is followed by the sweep in
 [`scenarios/README.md`](scenarios/README.md#after-an-s4-run).
 
@@ -395,13 +396,13 @@ instance yet.
 
 ## Tiers and status
 
-| Tier | Name          | Scope                                                                                                                                                        | Status                                                                                                                                                                                      |
-| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T0   | Scaffold      | Layout, toolchain, CI, environment roots, reference manifest, VERIFY.md                                                                                      | done; owner setup open                                                                                                                                                                      |
-| T1   | First night   | Main line with keypad triage and interview, generated district and queue flows, whispers, seasonal greetings, supporting resources in all three environments | live in dev, qa and prod, all in us-east-1 (2026-09-30); qa S2 waits on a quota increase                                                                                                    |
-| T2   | Full moon     | Holds, the Queue of the Dead, prank screen, work orders, callbacks, a hold A/B test with a recorded prompt, the address module (when flow-as-code C04 ships) | built; live apply pending (2026-10-05): PRs 1 to 7 merged, the close is the checklist in [T2](tasks/T2-full-moon.md); the address module waits on the flow-as-code release that carries C04 |
-| T3   | Witching hour | Bo as an agent, transfers to him and the Lantern Crew, the outbound whisper, the chat field guide, Lex if gated in, the drift-and-adopt scene                | planned 2026-10-04 ([T3](tasks/T3-witching-hour.md)); after the season; its chat flow waits for flow-as-code C11                                                                            |
-| T4   | Full coverage | Every documented action type flow-as-code Phase D models, used here or recorded as deploy-only or not coverable with the reason                              | planned 2026-10-04 ([T4](tasks/T4-full-coverage.md)); follows Phase D releases                                                                                                              |
+| Tier | Name          | Scope                                                                                                                                                        | Status                                                                                                                                                                                                                       |
+| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T0   | Scaffold      | Layout, toolchain, CI, environment roots, reference manifest, VERIFY.md                                                                                      | done; owner setup open                                                                                                                                                                                                       |
+| T1   | First night   | Main line with keypad triage and interview, generated district and queue flows, whispers, seasonal greetings, supporting resources in all three environments | live in dev, qa and prod, all in us-east-1 (2026-09-30); qa S2 waits on a quota increase                                                                                                                                     |
+| T2   | Full moon     | Holds, the Queue of the Dead, prank screen, work orders, callbacks, a hold A/B test with a recorded prompt, the address module (when flow-as-code C04 ships) | live in dev, qa and prod, all in us-east-1 (2026-10-06); S1 to S5 passed on dev, prod's scenarios not run at the close, qa's wait on a quota increase; the address module waits on the flow-as-code release that carries C04 |
+| T3   | Witching hour | Bo as an agent, transfers to him and the Lantern Crew, the outbound whisper, the chat field guide, Lex if gated in, the drift-and-adopt scene                | planned 2026-10-04 ([T3](tasks/T3-witching-hour.md)); after the season; its chat flow waits for flow-as-code C11                                                                                                             |
+| T4   | Full coverage | Every documented action type flow-as-code Phase D models, used here or recorded as deploy-only or not coverable with the reason                              | planned 2026-10-04 ([T4](tasks/T4-full-coverage.md)); follows Phase D releases                                                                                                                                               |
 
 Each tier's acceptance criteria are in [`tasks/`](tasks/).
 
