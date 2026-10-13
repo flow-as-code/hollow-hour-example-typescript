@@ -13,9 +13,11 @@ and amended 2026-10-05 on review (the callback carve-out, the closed hours,
 the key-use test, awscc's provider block, the hold flows and hooks, the
 module alias, the VERIFY status shape, the generic-block policy, the C11
 gate). Built 2026-10-05: PRs 1 to 7 are merged (`main` at `b8e5b3f`), PR 8
-stays out until the flow-as-code release that carries C04, and the live
-close has not run. "Record" below says where each criterion stands and
-"Close checklist" what the live session does, in order.
+stays out until the flow-as-code release that carries C04. The live close
+applied dev, qa and prod on 2026-10-06 and finished its scenario runs and
+VERIFY rows on 2026-10-13, when all five scenarios passed on prod; qa's
+wait on its concurrent-calls quota (see "The close" under Record). "Record" below says where each criterion stands
+and "Close checklist" what the live session did, in order.
 
 ## Scope
 
@@ -286,7 +288,7 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
    be recorded.
 10. README: "Scene 2: the Queue of the Dead", and the tier table updated.
 
-## Where the criteria stand (2026-10-05)
+## Where the criteria stand (2026-10-13)
 
 - [ ] 3, in part: `tests/coverage.test.ts` holds a per-tier floor
       (`TIER_FLOOR`) with a mutation case; tier 1's floor is the 24 types,
@@ -368,15 +370,20 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       back, `kind-check` says it is all right) and bans accusations. PR 7
       scans `prompts/salt-line-tips.txt` with the same checks and reads the
       wav's header (PCM, mono, 8 kHz, 16-bit, under 50 MB).
-- [ ] 8, in part: S1 (`scenarios/s1-safety-path.scenario.json`, PR 1), S5
+- [x] 8, 2026-10-13: S1 (`scenarios/s1-safety-path.scenario.json`, PR 1), S5
       (`scenarios/s5-departed-caller.scenario.json`, PR 3), S3
       (`scenarios/s3-theos-dare.scenario.json`, PR 4) and S4
       (`scenarios/s4-after-hours-callback.scenario.json`, PR 6, with the
       `hours:closed` substitution and the operator sweep in
       `scenarios/README.md`, "After an S4 run"), checked offline by
-      `tests/envScenarios.test.ts`; none run live yet. The hold flows and
-      the A/B branch are listed there as not simulatable.
-- [ ] 9, in part: `tests/verify.test.ts` accepts `docs-checked YYYY-MM-DD`
+      `tests/envScenarios.test.ts`. Live on dev: S1, S2, S3 and S5 passed
+      on 2026-10-06 and S4, run alone, on 2026-10-13, with a sweep that
+      found no callback. Live on prod: all five passed on 2026-10-13, with
+      two sweeps that found no callback. Open: qa's run, which waits on its
+      concurrent-calls quota (still 0; an increase to 10 was requested on
+      2026-10-13). The hold flows and the A/B
+      branch are listed there as not simulatable.
+- [x] 9, 2026-10-13: `tests/verify.test.ts` accepts `docs-checked YYYY-MM-DD`
       and `harness-checked YYYY-MM-DD: <result>` beside the two earlier
       shapes, each with positive and negative cases (PR 1). HC1 added with
       `hours:closed` (PR 3), `needs sandbox`; RS1 added for the recording
@@ -385,8 +392,12 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       DP1, P1 and E1 added with the prompt and the split (PR 7), each
       `needs sandbox` (E1's status mirrors the Terraform-first repository's
       `VERIFY.md`: it moves to `harness-checked` here once its mirror of
-      PR 7 records one there).
-- [ ] Recording storage (tier decision 5), checked 2026-10-05 at 17:25 UTC:
+      PR 7 records one there). All seven settled at the close: HC1, DP1, P1
+      and RS1 `sandbox-checked 2026-10-06`, D1 and CB1
+      `sandbox-checked 2026-10-13`, E1 `harness-checked 2026-10-05`
+      copied from that repository's row T10.
+- [x] Recording storage (tier decision 5), applied 2026-10-06 at 04:39:00
+      UTC (18 added; no policy added to any service-linked role). Checked 2026-10-05 at 17:25 UTC:
       `list-instance-storage-configs` for CALL_RECORDINGS returned `[]` on
       dev, qa and prod (all us-east-1), so `envs/bootstrap/recordings.tf`
       adds one private SSE-S3 bucket, a 30-day expiry rule and the storage
@@ -410,13 +421,17 @@ YYYY-MM-DD` and adds `harness-checked YYYY-MM-DD: <result>` for a result
       to a commit SHA, keyed on the lock files). The first flow to use
       `prompt:salt-line-tips` lands in the same PR as the resource and the
       provider in every root, never split.
-- [ ] 7: not started; the Close checklist below.
-- [ ] 10, in part: "Scene 2: the Queue of the Dead" with the prank-screen
+- [x] 7, 2026-10-06 (this repository): applied in dev, qa and prod, fresh
+      plans "No changes", `npm run drift` "No drift." on all three, and the
+      plans again "No changes" on 2026-10-13. The Terraform-first
+      repository's applies in us-west-2 are its own close.
+- [x] 10, 2026-10-13: "Scene 2: the Queue of the Dead" with the prank-screen
       and callback beats landed with the close preparation (branch
       `t2/close-prep`), and the tier table row reads "built; live apply
-      pending (2026-10-05)". The row flips to live at the close.
+      pending (2026-10-05)" until the close flipped it to live in dev, qa
+      and prod (2026-10-06).
 
-## Record (2026-10-05, before the close)
+## Record (2026-10-05, brought up to date at the close, 2026-10-13)
 
 Every criterion, with the evidence so far. PR numbers are this repository's
 (`#4` to `#11`), each with its merge commit on `main`; test names are from
@@ -483,7 +498,8 @@ prod. The PRs and their merges:
    `diff -r build/emit/qa build/emit/prod` empty. `hours:closed` and
    `prompt:salt-line-tips` bind identically in every profile
    (`tests/envSupporting.test.ts`). Complete.
-7. **Live**: not started. The cumulative read-only dev plan stands at
+7. **Live**: applied in dev, qa and prod on 2026-10-06; the figures are
+   under "The close" below. Before the close, the cumulative read-only dev plan stands at
    **16 to add, 10 to change, 0 to destroy** after PR 7 (PR 2: 2 to add, 5
    to change; PR 3: 7 and 5; PR 4: 7 and 7; PR 5: 7 and 10; PR 6: 10 and
    10). The adds: `aws_connect_hours_of_operation.closed`, the six dead-line
@@ -493,24 +509,54 @@ prod. The PRs and their merges:
    generated menu, the three district flows, the three queue flows and the
    two stub Lambdas whose comments changed (PR 4). The bootstrap root was
    validated at PR 3, never planned; its apply adds 18 resources. qa and
-   prod were never planned with Tier 2 in them.
+   prod were never planned with Tier 2 in them before the close.
 8. **Scenarios**: S1 (PR 1), S5 (PR 3), S3 (PR 4) and S4 with its sweep
    (PR 6) are checked offline by `tests/envScenarios.test.ts` ("holds S1 to
    S5", and per file: valid for the pinned CLI, every token resolvable, only
-   prompts the flows say, the stubs' answers, keys the prompt takes). None
-   has run live. The not-simulatable list is the table in
+   prompts the flows say, the stubs' answers, keys the prompt takes). Live
+   results are under "The close" below. The not-simulatable list is the table in
    `scenarios/README.md`, "What can be simulated".
 9. **VERIFY rows**: HC1 and RS1 (PR 3), D1 (PR 5), CB1 (PR 6), DP1, P1 and
-   E1 (PR 7) are in `VERIFY.md`, each `needs sandbox` with its AWS
-   documentation and a sentence naming what decides it;
+   E1 (PR 7) are in `VERIFY.md`, each `needs sandbox` before the close with its AWS
+   documentation and a sentence naming what decides it, until the close
+   settled all seven (below);
    `tests/verify.test.ts` requires each id since the close preparation. The
    status shapes `docs-checked YYYY-MM-DD` and `harness-checked YYYY-MM-DD:
-<result>` landed in PR 1 with their positive and negative cases. Open
-   until the close records results.
+<result>` landed in PR 1 with their positive and negative cases.
 10. **README**: "Scene 2: the Queue of the Dead", with the prank screen and
     callbacks as beats under it, landed with the close preparation; the
-    tier table row reads "built; live apply pending (2026-10-05)" and flips
-    at the close.
+    tier table row read "built; live apply pending (2026-10-05)" and flipped
+    at the close to live in dev, qa and prod (2026-10-06).
+
+### The close (2026-10-06 and 2026-10-13)
+
+All times UTC, all in us-east-1, the saved-plan form throughout. The first
+session (2026-10-06) ran checklist steps 1 to 6 on dev, qa and prod; its
+scratch copies were lost to a restart, so its figures are from the session
+transcript. The second (2026-10-13) re-planned, ran the scenarios that were
+open, and wrote the VERIFY rows.
+
+| Step                | When                                     | What it showed                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1, start            | 2026-10-06 04:37:13 to 04:37:37          | `main` at `84db5c0`; `npm run check` green (lint:flows no findings, 21 test files, 557 passed, 1 skipped); `@flow-as-code/cli` 0.2.1 on npm, the pins 0.2.1                                                                                                                                                                                                                                                                                                                    |
+| 2, bootstrap (RS1)  | 2026-10-06 04:37:38 to 04:39:08          | plan "18 to add, 0 to change, 0 to destroy", exactly the `recordings.tf` resources; applied 04:39:00; CALL_RECORDINGS shows the S3 config on all three; the service-linked roles carry only AmazonConnectServiceDirectoryServiceAccess                                                                                                                                                                                                                                         |
+| 3, seasonal roots   | 2026-10-06 04:38:16 to 04:38:23          | "No changes" on dev, qa and prod                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 4, flow roots       | 2026-10-06 04:39:41 to 04:43:47          | dev plan "16 to add, 10 to change, 0 to destroy", the resources criterion 7 lists, applied 04:40:27; qa the same list, applied 04:42:30; prod the same list, applied 04:43:33; each re-plan "No changes". HC1, DP1 and P1 answered on dev (VERIFY.md)                                                                                                                                                                                                                          |
+| 5, drift            | 2026-10-06 04:41:21 to 04:44:01          | "No drift." on dev (37 references), qa and prod                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 6, scenarios on dev | 2026-10-06 04:42:28 to 04:44:30          | the five at once: JUnit tests=5 failures=0 errors=1 (454.380 s); S1, S2, S3 and S5 passed; S4 errored "Too Many Requests", running beside the other four                                                                                                                                                                                                                                                                                                                       |
+| 6, S4 alone on dev  | 2026-10-13 15:49:30 to 15:51:34          | exit 0, JUnit tests=1 failures=0 errors=0 (122.404 s)                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 7, sweep (CB1)      | 2026-10-13 15:49 and 15:51:39, 15:52:09  | no callback contact in dispatch-overflow on dev, qa or prod since 2026-10-06 04:30; none since the S4 run on dev, twice; nothing to stop                                                                                                                                                                                                                                                                                                                                       |
+| 6, qa               | 2026-10-06 04:44:24; 2026-10-13 15:53:41 | S2 alone: "Too Many Requests" while the dev suite ran; then "INITIALIZATION_FAILURE: Failed to start execution of test case due to limit reached." (JUnit tests=1 failures=1). Quota L-12AB7C57, "Concurrent active calls per instance", reads 0 on the qa instance and 10 on dev and prod; a request for 10 on the qa instance made on 2026-09-30 closed on 2026-10-11 with the value still 0, and a new one made at 16:54:17 UTC on 2026-10-13 read CASE_OPENED at 17:08 UTC |
+| 6, prod             | 2026-10-13 17:04:31 to 17:06:34          | the five at once: exit 0, JUnit tests=5 failures=0 errors=0 (S1 65.191 s, S2 104.775, S3 105.780, S4 122.940, S5 55.142), no "Too Many Requests"                                                                                                                                                                                                                                                                                                                               |
+| 7, sweep on prod    | 2026-10-13 17:06:51, 17:07:35            | no callback contact in dispatch-overflow since the prod run began, twice; nothing to stop                                                                                                                                                                                                                                                                                                                                                                                      |
+| 8, D1               | 2026-10-13 15:52                         | the S3 contact of 2026-10-06 and the S4 contact both carry Name "Hollow Hour work order" and the advice as Description; a Name search finds them (VERIFY.md, D1)                                                                                                                                                                                                                                                                                                               |
+| re-plan             | 2026-10-13 15:47:29 to 15:48:39          | `plan -lock=false` of the dev, qa and prod flow roots after `npm run emit:<env>`: "No changes" on each                                                                                                                                                                                                                                                                                                                                                                         |
+
+S5's callback-number branch (VERIFY.md, 6.2) is not shown by the execution
+records the harness keeps, so 6.2 stays open. Checklist step 10, the
+Terraform-first close, is that repository's: it mirrored PRs 1 to 7 on
+2026-10-05 (snapshot `b8e5b3f`) and has not re-vendored from this close
+or applied in us-west-2, so criterion 1's second half is open there.
 
 ## Close checklist
 
