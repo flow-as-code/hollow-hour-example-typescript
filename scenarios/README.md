@@ -117,3 +117,10 @@ instance's Service Quotas value "Concurrent active calls per instance",
 applied at the instance level, reads 0; dev's reads 10 and dev runs. A
 simulated voice contact is a call, so that quota is the likely cause, to be
 confirmed by a run after raising it.
+
+On 2026-10-13 (UTC) S2 run alone on qa failed the same way at 15:53:41.
+The quota is Service Quotas code `L-12AB7C57`, "Concurrent active calls per
+instance": 10 at the account level, and at the instance level 0 on qa and 10
+on dev and prod; no increase has been requested. Running the five scenarios
+at once on dev returned "Too Many Requests" for one of them on 2026-10-06,
+and the same scenario passed run alone on 2026-10-13, so run S4 by itself.
